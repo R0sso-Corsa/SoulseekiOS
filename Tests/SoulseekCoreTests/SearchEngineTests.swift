@@ -17,6 +17,10 @@ extension FakeServer {
         var buf = Data()
         while true {
             if let parsed = try PeerInitMessages.parseInitFrame(buf) {
+                // Loopback often coalesces the init frame with the next frame
+                // in one recv — keep the leftovers for readFrame().
+                let leftover = buf.dropFirst(parsed.consumed)
+                if !leftover.isEmpty { reader.append(Data(leftover)) }
                 return (parsed.code, parsed.payload)
             }
             var tmp = [UInt8](repeating: 0, count: 65536)

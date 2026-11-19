@@ -1,5 +1,6 @@
 import Foundation
 import Network
+
 import SoulseekProtocol
 
 /// Download engine: QueueDownload over P, TransferRequest/Reply handshake,
@@ -203,7 +204,7 @@ public actor TransferEngine {
     private func dialIndirectF(_ request: ConnectToPeerRequest) async {
         guard let port = NWEndpoint.Port(rawValue: UInt16(clamping: request.port)) else { return }
         let conn = NWConnection(host: NWEndpoint.Host(request.ip), port: port, using: .tcp)
-        guard await nwWaitReady(conn) else {
+            guard await nwWaitReady(conn) else {
             conn.cancel()
             try? await server.send(frame: ServerMessages.cannotConnect(ticket: request.ticket, username: request.username))
             return
@@ -267,8 +268,9 @@ public actor TransferEngine {
         while received < t.size {
             if Task.isCancelled || transfer(id)?.state == .cancelled { conn.cancel(); return }
             if buffer.isEmpty {
-                guard let chunk = await nwReceiveChunk(conn) else {
-                    // Uploader closed early — keep the partial for resume.
+                // 60s idle bound: a stalled uploader fails the transfer (the
+                // .partial is kept, so retry resumes) instead of hanging it.
+                guard let chunk = await nwReceiveChunk(conn, timeout: 60_000_000_000) else {
                     fail(id, "incomplete (\(received)/\(t.size) bytes) — retry to resume")
                     conn.cancel()
                     return

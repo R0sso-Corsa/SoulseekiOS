@@ -69,6 +69,11 @@ final class SearchModel {
         Task { await transferEngine?.download(username: username, filename: file.path, size: file.size) }
     }
 
+    /// Browse results carry basenames; the full path is folder + separator + name.
+    func download(path: String, size: UInt64, from username: String) {
+        Task { await transferEngine?.download(username: username, filename: path, size: size) }
+    }
+
     private func scheduleRecompute() {
         recomputeTask?.cancel()
         let replies = engineState.replies

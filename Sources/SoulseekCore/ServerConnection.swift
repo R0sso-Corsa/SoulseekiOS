@@ -45,6 +45,8 @@ public actor ServerConnection {
     private var pingTask: Task<Void, Never>?
     private var loginContinuation: CheckedContinuation<Void, Never>?
     private var addressRequests: [String: CheckedContinuation<PeerAddressReply, Error>] = [:]
+    private var statsRequests: [String: CheckedContinuation<UserStats, Error>] = [:]
+    private var statusRequests: [String: CheckedContinuation<UserStatus, Error>] = [:]
 
     public init() {
         var continuation: AsyncStream<State>.Continuation?
@@ -96,8 +98,13 @@ public actor ServerConnection {
                 }
             }
             conn.start(queue: DispatchQueue(label: "slsk.server.connection"))
+            Task {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                once.fire { cont.resume(returning: false) }
+            }
         }
         guard ready, connection != nil else {
+            conn.cancel()
             if state == .connecting { setState(.failed("connection failed")) }
             return
         }
@@ -109,7 +116,22 @@ public actor ServerConnection {
             await fail("send login: \(error.localizedDescription)")
             return
         }
+        let loginTimeout = Task {
+            do {
+                try await Task.sleep(nanoseconds: 20_000_000_000)
+            } catch { return } // cancelled: login completed
+            await self.loginTimedOut()
+        }
         await withCheckedContinuation { loginContinuation = $0 }
+        loginTimeout.cancel()
+    }
+
+    private func loginTimedOut() async {
+        if loginContinuation != nil, state == .connecting {
+            setState(.failed("login timed out"))
+            await tearDown(keepState: true)
+            resumeLogin()
+        }
     }
 
     public func disconnect() async {
@@ -135,6 +157,42 @@ public actor ServerConnection {
 
     private func timeoutAddressRequest(_ username: String) async {
         if let cont = addressRequests.removeValue(forKey: username) {
+            cont.resume(throwing: ConnectionError.addressTimeout)
+        }
+    }
+
+    /// Resolve a user's upload stats via GetUserStats(36); 10s timeout.
+    public func userStats(for username: String) async throws -> UserStats {
+        try await send(ServerMessages.getUserStats(username: username))
+        return try await withCheckedThrowingContinuation { cont in
+            statsRequests[username] = cont
+            Task {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                await self.timeoutStatsRequest(username)
+            }
+        }
+    }
+
+    /// Resolve a user's online/away status via GetUserStatus(7); 10s timeout.
+    public func userStatus(for username: String) async throws -> UserStatus {
+        try await send(ServerMessages.getUserStatus(username: username))
+        return try await withCheckedThrowingContinuation { cont in
+            statusRequests[username] = cont
+            Task {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                await self.timeoutStatusRequest(username)
+            }
+        }
+    }
+
+    private func timeoutStatsRequest(_ username: String) async {
+        if let cont = statsRequests.removeValue(forKey: username) {
+            cont.resume(throwing: ConnectionError.addressTimeout)
+        }
+    }
+
+    private func timeoutStatusRequest(_ username: String) async {
+        if let cont = statusRequests.removeValue(forKey: username) {
             cont.resume(throwing: ConnectionError.addressTimeout)
         }
     }
@@ -246,6 +304,16 @@ public actor ServerConnection {
                let cont = addressRequests.removeValue(forKey: reply.username) {
                 cont.resume(returning: reply)
             }
+        case 36: // GetUserStats reply
+            if let reply = try? UserStats(payload: frame.payload),
+               let cont = statsRequests.removeValue(forKey: reply.username) {
+                cont.resume(returning: reply)
+            }
+        case 7: // GetUserStatus reply
+            if let reply = try? UserStatus(payload: frame.payload),
+               let cont = statusRequests.removeValue(forKey: reply.username) {
+                cont.resume(returning: reply)
+            }
         case 18: // ConnectToPeer: indirect connection request; route by type
             if let request = try? ConnectToPeerRequest(payload: frame.payload) {
                 if request.type == "F" {
@@ -266,14 +334,14 @@ public actor ServerConnection {
 
     private func startPing() {
         pingTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
-                if Task.isCancelled { return }
-                do {
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
+                    if Task.isCancelled { return }
                     try await self.send(ServerMessages.ping())
-                } catch {
-                    return
                 }
+            } catch {
+                return // cancelled or send failed — ping loop exits quietly
             }
         }
     }

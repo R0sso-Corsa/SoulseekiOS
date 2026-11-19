@@ -3,6 +3,8 @@ import SoulseekProtocol
 
 struct SearchView: View {
     @Bindable var model: SearchModel
+    var appModel: AppModel? = nil
+    @State private var selectedUser: String?
 
     var body: some View {
         ZStack {
@@ -95,7 +97,13 @@ struct SearchView: View {
                                     .font(.caption).bold()
                                     .lineLimit(2)
                                 HStack(spacing: 4) {
-                                    Text(group.username)
+                                    Button {
+                                        selectedUser = group.username
+                                    } label: {
+                                        Text(group.username).underline()
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("userButton")
                                     if group.freeSlots {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(.green)
@@ -123,6 +131,14 @@ struct SearchView: View {
             }
         }
         .navigationTitle("Search")
+        .sheet(isPresented: Binding(
+            get: { selectedUser != nil },
+            set: { if !$0 { selectedUser = nil } }
+        )) {
+            if let username = selectedUser, let appModel {
+                UserView(appModel: appModel, username: username)
+            }
+        }
     }
 }
 

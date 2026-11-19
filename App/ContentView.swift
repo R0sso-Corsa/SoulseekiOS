@@ -8,7 +8,7 @@ struct ContentView: View {
         case .connected(let greeting, let publicIP, let privileged):
             TabView {
                 NavigationStack {
-                    SearchView(model: model.searchModel)
+                    SearchView(model: model.searchModel, appModel: model)
                 }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 NavigationStack {

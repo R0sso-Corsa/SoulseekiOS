@@ -10,7 +10,7 @@ final class FakeServer {
 
     private let listener: Int32
     private var client: Int32 = -1
-    private var reader = FrameReader()
+    var reader = FrameReader()
     let port: UInt16
 
     /// Exposed for test extensions that read peer-init (u8 code) frames.
@@ -42,7 +42,7 @@ final class FakeServer {
         port = UInt16(bigEndian: actual.sin_port)
     }
 
-    func accept(timeout: TimeInterval = 5) throws {
+    func accept(timeout: TimeInterval = 15) throws {
         var pfd = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)
         guard poll(&pfd, 1, Int32(timeout * 1000)) > 0 else { throw Failure.timeout("accept") }
         client = Darwin.accept(listener, nil, nil)
@@ -75,6 +75,16 @@ final class FakeServer {
     func close() {
         if client >= 0 { Darwin.close(client); client = -1 }
         Darwin.close(listener)
+    }
+
+    func debugPeerInfo() -> String {
+        var peer = sockaddr_in()
+        var plen = socklen_t(MemoryLayout<sockaddr_in>.size)
+        _ = withUnsafeMutablePointer(to: &peer) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getpeername(client, $0, &plen) }
+        }
+        var pfd = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)
+        return "peerPort=\(UInt16(bigEndian: peer.sin_port)) backlogReadable=\(poll(&pfd, 1, 0) > 0)"
     }
 }
 

@@ -47,13 +47,22 @@ func nwSend(_ conn: NWConnection, data: Data) async throws {
     }
 }
 
-func nwReceiveChunk(_ conn: NWConnection) async -> Data? {
+func nwReceiveChunk(_ conn: NWConnection, timeout: UInt64? = nil) async -> Data? {
     await withCheckedContinuation { cont in
+        let once = OnceFlag()
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
-            if error != nil || data == nil || data!.isEmpty {
-                cont.resume(returning: nil)
-            } else {
-                cont.resume(returning: data)
+            once.fire {
+                if error != nil || data == nil || data!.isEmpty {
+                    cont.resume(returning: nil)
+                } else {
+                    cont.resume(returning: data)
+                }
+            }
+        }
+        if let timeout {
+            Task {
+                try? await Task.sleep(nanoseconds: timeout)
+                once.fire { cont.resume(returning: nil) }
             }
         }
     }

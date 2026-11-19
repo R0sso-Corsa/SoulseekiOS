@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+
 import XCTest
 import SoulseekProtocol
 @testable import SoulseekCore
@@ -58,6 +59,7 @@ final class TransferEngineTests: XCTestCase {
 
         let conn = ServerConnection()
         let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
         try await login(conn, server)
 
         let file = "@@music\\Test\\song.mp3"
@@ -129,6 +131,7 @@ final class TransferEngineTests: XCTestCase {
 
         let conn = ServerConnection()
         let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
         try await login(conn, server)
 
         let file = "@@music\\Test\\song.mp3"
@@ -181,6 +184,7 @@ final class TransferEngineTests: XCTestCase {
 
         let conn = ServerConnection()
         let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
         try await login(conn, server)
 
         let file = "@@music\\Test\\song.mp3"
