@@ -4,7 +4,7 @@ import SoulseekProtocol
 
 /// Actor-isolated connection to the Soulseek login server.
 /// Lifecycle: connect → Login(1) → post-login handshake → connected (5-min ping).
-/// The UI consumes `states`; socket callbacks hop back onto the actor.
+/// The UI consumes `states`; peer-related server messages surface on `events`.
 public actor ServerConnection {
     public enum State: Equatable, Sendable {
         case disconnected
@@ -14,11 +14,18 @@ public actor ServerConnection {
         case kicked
     }
 
+    public enum ServerEvent: Sendable {
+        case connectToPeer(ConnectToPeerRequest)
+        case cannotConnect(ticket: UInt32)
+    }
+
     public enum ConnectionError: Error { case notConnected }
 
     public private(set) var state: State = .disconnected
     public nonisolated let states: AsyncStream<State>
+    public nonisolated let events: AsyncStream<ServerEvent>
     private let stateContinuation: AsyncStream<State>.Continuation
+    private let eventContinuation: AsyncStream<ServerEvent>.Continuation
 
     private var connection: NWConnection?
     private var reader = FrameReader()
@@ -31,10 +38,14 @@ public actor ServerConnection {
         var continuation: AsyncStream<State>.Continuation?
         states = AsyncStream { continuation = $0 }
         stateContinuation = continuation!
+        var eventCont: AsyncStream<ServerEvent>.Continuation?
+        events = AsyncStream { eventCont = $0 }
+        eventContinuation = eventCont!
     }
 
     deinit {
         stateContinuation.finish()
+        eventContinuation.finish()
     }
 
     /// Connect and log in. Returns once the login response (or a failure) is
@@ -87,6 +98,11 @@ public actor ServerConnection {
 
     public func disconnect() async {
         await tearDown()
+    }
+
+    /// Send a raw frame to the server (SearchEngine and later slices).
+    public func send(frame: Data) async throws {
+        try await send(frame)
     }
 
     // MARK: - Internals
@@ -191,6 +207,15 @@ public actor ServerConnection {
             setState(.kicked)
             await tearDown(keepState: true)
             resumeLogin()
+        case 18: // ConnectToPeer: a peer wants an indirect connection
+            if let request = try? ConnectToPeerRequest(payload: frame.payload) {
+                eventContinuation.yield(.connectToPeer(request))
+            }
+        case 1001: // CannotConnect
+            var r = MessageReader(frame.payload)
+            if let ticket = try? r.u32() {
+                eventContinuation.yield(.cannotConnect(ticket: ticket))
+            }
         default:
             break // post-login burst (RoomList, PrivilegedUsers, …) — later slices consume these
         }
@@ -211,7 +236,7 @@ public actor ServerConnection {
 }
 
 /// Resumes a continuation exactly once across racing Network.framework callbacks.
-private final class OnceFlag: @unchecked Sendable {
+final class OnceFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var fired = false
 

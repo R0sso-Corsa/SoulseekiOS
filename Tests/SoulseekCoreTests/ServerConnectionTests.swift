@@ -13,6 +13,9 @@ final class FakeServer {
     private var reader = FrameReader()
     let port: UInt16
 
+    /// Exposed for test extensions that read peer-init (u8 code) frames.
+    var clientFd: Int32 { client }
+
     init() throws {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { throw Failure.socket("socket") }
