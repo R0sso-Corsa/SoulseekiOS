@@ -5,84 +5,118 @@ struct SearchView: View {
     @Bindable var model: SearchModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                TextField("Search Soulseek…", text: $model.queryText)
-                    .textFieldStyle(.roundedBorder)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .accessibilityIdentifier("searchField")
-                    .onSubmit { model.search() }
-                Button(model.isSearching ? "Stop" : "Search") {
-                    if model.isSearching { model.stop() } else { model.search() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.queryText.trimmingCharacters(in: .whitespaces).isEmpty && !model.isSearching)
-                .accessibilityIdentifier("searchButton")
-            }
-            .padding([.horizontal, .top])
-
-            HStack {
-                Menu {
-                    Picker("Min bitrate", selection: $model.minBitrate) {
-                        Text("Any bitrate").tag(0)
-                        Text("128+").tag(128)
-                        Text("192+").tag(192)
-                        Text("256+").tag(256)
-                        Text("320").tag(320)
+        ZStack {
+            GlassBackground()
+            VStack(spacing: 12) {
+                GlassEffectContainer(spacing: 10) {
+                    HStack(spacing: 10) {
+                        TextField("Search Soulseek…", text: $model.queryText)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .glassEffect(.regular.interactive(), in: .capsule)
+                            .accessibilityIdentifier("searchField")
+                            .onSubmit { model.search() }
+                        Button {
+                            if model.isSearching { model.stop() } else { model.search() }
+                        } label: {
+                            Image(systemName: model.isSearching ? "stop.fill" : "magnifyingglass")
+                                .font(.body.weight(.semibold))
+                                .padding(12)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .disabled(model.queryText.trimmingCharacters(in: .whitespaces).isEmpty && !model.isSearching)
+                        .accessibilityIdentifier("searchButton")
+                        .accessibilityLabel(model.isSearching ? "Stop" : "Search")
                     }
-                } label: {
-                    Label(model.minBitrate == 0 ? "Bitrate" : "\(model.minBitrate)+", systemImage: "waveform")
                 }
-                Toggle("Slots", isOn: $model.freeSlotsOnly)
-                    .toggleStyle(.button)
-                Toggle("Lossless", isOn: $model.losslessOnly)
-                    .toggleStyle(.button)
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 6)
-
-            Text(model.statusText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
-                .accessibilityIdentifier("searchStatus")
+                .padding(.top, 4)
 
-            List {
-                ForEach(model.groups) { group in
-                    Section {
-                        ForEach(group.files, id: \.path) { file in
-                            FileRow(file: file)
-                        }
-                    } header: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(group.folder.isEmpty ? "(root)" : group.folder)
-                                .font(.caption).bold()
-                                .lineLimit(2)
-                            HStack(spacing: 4) {
-                                Text(group.username)
-                                if group.freeSlots {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                }
-                                Text("\(group.avgSpeed / 1024) KB/s")
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Menu {
+                            Picker("Min bitrate", selection: $model.minBitrate) {
+                                Text("Any bitrate").tag(0)
+                                Text("128+").tag(128)
+                                Text("192+").tag(192)
+                                Text("256+").tag(256)
+                                Text("320").tag(320)
                             }
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        } label: {
+                            GlassChipLabel(
+                                title: model.minBitrate == 0 ? "Bitrate" : "\(model.minBitrate)+",
+                                systemImage: "waveform",
+                                selected: model.minBitrate > 0
+                            )
+                        }
+                        Button { model.freeSlotsOnly.toggle() } label: {
+                            GlassChipLabel(title: "Slots", systemImage: "checkmark.circle", selected: model.freeSlotsOnly)
+                        }
+                        .buttonStyle(.plain)
+                        Button { model.losslessOnly.toggle() } label: {
+                            GlassChipLabel(title: "Lossless", systemImage: "hifispeaker", selected: model.losslessOnly)
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal)
+
+                HStack {
+                    HStack(spacing: 6) {
+                        if model.isSearching {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(model.statusText)
+                            .font(.footnote)
+                            .accessibilityIdentifier("searchStatus")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .glassEffect(.regular, in: .capsule)
+                    Spacer()
+                }
+                .padding(.horizontal)
+
+                List {
+                    ForEach(model.groups) { group in
+                        Section {
+                            ForEach(group.files, id: \.path) { file in
+                                FileRow(file: file)
+                            }
+                        } header: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(group.folder.isEmpty ? "(root)" : group.folder)
+                                    .font(.caption).bold()
+                                    .lineLimit(2)
+                                HStack(spacing: 4) {
+                                    Text(group.username)
+                                    if group.freeSlots {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                    }
+                                    Text("\(group.avgSpeed / 1024) KB/s")
+                                }
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
-            }
-            .listStyle(.plain)
-            .overlay {
-                if model.groups.isEmpty && !model.isSearching {
-                    ContentUnavailableView(
-                        "No results",
-                        systemImage: "magnifyingglass",
-                        description: Text("Search for artists, albums, or labels.")
-                    )
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .contentMargins(.bottom, 64, for: .scrollContent)
+                .overlay {
+                    if model.groups.isEmpty && !model.isSearching {
+                        ContentUnavailableView(
+                            "No results",
+                            systemImage: "magnifyingglass",
+                            description: Text("Search for artists, albums, or labels.")
+                        )
+                    }
                 }
             }
         }

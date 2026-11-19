@@ -29,6 +29,8 @@ final class SearchUITests: XCTestCase {
         let searchTab = app.tabBars.buttons["Search"]
         XCTAssertTrue(searchTab.waitForExistence(timeout: 5), "Search tab missing")
         searchTab.tap()
+        // Confirm the search screen is fully presented before interacting.
+        XCTAssertTrue(app.staticTexts["searchStatus"].waitForExistence(timeout: 10), "search screen not presented")
 
         let searchField = app.textFields["searchField"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -38,13 +40,14 @@ final class SearchUITests: XCTestCase {
 
         // Results must arrive from the live network via the indirect path.
         let firstRow = app.staticTexts["resultFilename"].firstMatch
-        XCTAssertTrue(firstRow.waitForExistence(timeout: 60), "no search results rendered")
-        XCTAssertTrue(app.staticTexts["searchStatus"].exists)
-
+        let appeared = firstRow.waitForExistence(timeout: 90)
+        // Capture state regardless, so failures are diagnosable.
         let screenshot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = "search-results"
+        attachment.name = appeared ? "search-results" : "search-FAILURE"
         attachment.lifetime = .keepAlways
         add(attachment)
+        XCTAssertTrue(appeared, "no search results rendered")
+        XCTAssertTrue(app.staticTexts["searchStatus"].exists)
     }
 }

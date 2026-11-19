@@ -15,6 +15,7 @@
 		32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */; };
 		4BEED639ADEB8E26647ACF28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FA896C59EBF67275ACDD076 /* Assets.xcassets */; };
 		A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */; };
+		A99CA29523A7C22074DC4A1D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34AB7531761603E0550DCA9 /* GlassStyle.swift */; };
 		ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACC65140334C67989CF2407 /* LoginView.swift */; };
 		B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D01518FCEE615528776464F /* SearchView.swift */; };
 		BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469C71F2B052D3754B85DF9A /* AppModel.swift */; };
@@ -42,6 +43,7 @@
 		7ACC65140334C67989CF2407 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A7E50120037E89A83F6D9B65 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AE47E1E44AAB78905BDF28F6 /* SoulseekiOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SoulseekiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B34AB7531761603E0550DCA9 /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SoulseekiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulseekiOSApp.swift; sourceTree = "<group>"; };
 		F41AA9BE35D4320C5763AE59 /* SoulseekiOS */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SoulseekiOS; path = .; sourceTree = SOURCE_ROOT; };
@@ -103,6 +105,7 @@
 				3FA896C59EBF67275ACDD076 /* Assets.xcassets */,
 				10B05165D9BA257D45076858 /* ConnectedView.swift */,
 				A7E50120037E89A83F6D9B65 /* ContentView.swift */,
+				B34AB7531761603E0550DCA9 /* GlassStyle.swift */,
 				7ACC65140334C67989CF2407 /* LoginView.swift */,
 				5D771E7F90F60B1F8D953E13 /* SearchModel.swift */,
 				1D01518FCEE615528776464F /* SearchView.swift */,
@@ -212,6 +215,7 @@
 				BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */,
 				2D3FDE9A541C95D9675FCF37 /* ConnectedView.swift in Sources */,
 				FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */,
+				A99CA29523A7C22074DC4A1D /* GlassStyle.swift in Sources */,
 				ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */,
 				13F8BB00A9BB3AEDD50CD7CE /* SearchModel.swift in Sources */,
 				B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */,

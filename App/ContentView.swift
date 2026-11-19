@@ -23,10 +23,12 @@ struct ContentView: View {
                 }
                 .tabItem { Label("Status", systemImage: "person.crop.circle") }
             }
+            .tint(.orange)
         default:
             NavigationStack {
                 LoginView(model: model)
             }
+            .tint(.orange)
         }
     }
 }
