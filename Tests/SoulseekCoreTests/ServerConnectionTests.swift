@@ -144,6 +144,56 @@ final class ServerConnectionTests: XCTestCase {
         XCTAssertEqual(after, .disconnected)
     }
 
+    /// Two concurrent GetPeerAddress lookups for the SAME user must both
+    /// resolve from one reply — a per-username continuation map that
+    /// overwrites leaks waiters (eternal "Connecting…" in the UI).
+    func testConcurrentAddressRequestsSameUser() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        addTeardownBlock { await conn.disconnect() }
+
+        async let connecting: Void = conn.connect(username: "tester", password: "pw", host: "127.0.0.1", port: server.port)
+        try server.accept()
+        _ = try server.readFrame()
+        try server.send(loginSuccessFrame(greeting: "", ip: [127, 0, 0, 1], privileged: false))
+        for _ in 0..<9 { _ = try server.readFrame() }
+        await connecting
+
+        let replyTask = Task {
+            _ = try server.readFrame() // address request 1
+            _ = try server.readFrame() // address request 2
+            var w = MessageWriter()
+            w.string("someone")
+            w.u8(1); w.u8(0); w.u8(0); w.u8(127)
+            w.u32(2240)
+            w.u32(0); w.u8(0); w.u8(0)
+            try server.send(w.frame(code: 3))
+        }
+        // Race the lookups against a deadline WITHOUT awaiting the lookup
+        // task: with the bug, its continuation leaks and never finishes.
+        let ok = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            let once = OnceFlag()
+            Task {
+                do {
+                    async let a = conn.peerAddress(for: "someone")
+                    async let b = conn.peerAddress(for: "someone")
+                    let ra = try await a
+                    let rb = try await b
+                    once.fire { cont.resume(returning: ra.port == 2240 && rb.port == 2240) }
+                } catch {
+                    once.fire { cont.resume(returning: false) }
+                }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                once.fire { cont.resume(returning: false) }
+            }
+        }
+        try await replyTask.value
+        XCTAssertTrue(ok, "concurrent same-user address requests leaked a continuation")
+    }
+
     func testLoginFailureSurfacesReason() async throws {
         let server = try FakeServer()
         defer { server.close() }

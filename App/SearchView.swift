@@ -145,6 +145,7 @@ struct SearchView: View {
                                     if group.freeSlots {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(.green)
+                                            .accessibilityIdentifier("freeSlotsBadge")
                                     }
                                     Text("\(group.avgSpeed / 1024) KB/s")
                                 }

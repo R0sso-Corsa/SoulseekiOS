@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import SoulseekCore
 import SoulseekProtocol
 
@@ -191,6 +192,33 @@ final class AppModel {
         username = ""
         password = ""
         disconnect()
+    }
+
+    // MARK: - App lifecycle (background downloads)
+
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+
+    /// Backgrounded: keep downloading for the system grace period (~30s);
+    /// when it expires, pause everything cleanly (.partial files preserved).
+    func sceneBackgrounded() {
+        guard backgroundTask == .invalid else { return }
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "downloads-grace") { [weak self] in
+            Task { await self?.transferEngine.pauseAll() }
+            self?.endBackgroundTask()
+        }
+    }
+
+    /// Foregrounded: resume anything paused while away.
+    func sceneForegrounded() {
+        endBackgroundTask()
+        Task { await transferEngine.resumeAll() }
+    }
+
+    private func endBackgroundTask() {
+        if backgroundTask != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTask)
+            backgroundTask = .invalid
+        }
     }
 
     private func apply(_ state: ServerConnection.State) {

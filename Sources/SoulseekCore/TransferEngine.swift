@@ -12,6 +12,7 @@ public actor TransferEngine {
         case connecting
         case waiting(place: UInt32?)
         case downloading
+        case paused
         case completed
         case failed(String)
         case cancelled
@@ -100,6 +101,27 @@ public actor TransferEngine {
         publish()
     }
 
+    /// App backgrounded: stop active transfers cleanly, keeping .partial files
+    /// and received counts so resumeAll can continue from the exact offset.
+    public func pauseAll() async {
+        for t in transfers {
+            switch t.state {
+            case .queued, .connecting, .waiting, .downloading:
+                update(t.id, force: true) { $0.state = .paused }
+                teardownConns(t.id)
+            default:
+                break
+            }
+        }
+    }
+
+    /// App foregrounded: re-queue everything paused (resumes from .partial).
+    public func resumeAll() async {
+        for t in transfers where t.state == .paused {
+            await retry(t.id)
+        }
+    }
+
     public func requestQueuePlace(_ id: UUID) async {
         guard let t = transfer(id), let conn = pConns[id] else { return }
         try? await nwSend(conn, data: PeerMessages.placeInQueueRequest(filename: t.filename))
@@ -184,10 +206,13 @@ public actor TransferEngine {
     }
 
     private func runDownload(_ id: UUID) async {
-        guard let t = transfer(id) else { return }
+        guard let t = transfer(id), t.state == .queued || t.state == .connecting else { return }
         update(id, force: true) { $0.state = .connecting }
         do {
             let addr = try await server.peerAddress(for: t.username)
+            // A pause/cancel may have landed while we awaited the address —
+            // never resurrect a torn-down transfer (zombie run).
+            if Task.isCancelled || transfer(id)?.state == .paused || transfer(id)?.state == .cancelled { return }
             guard addr.isOnline else { fail(id, "user is offline"); return }
             guard let port = NWEndpoint.Port(rawValue: UInt16(clamping: addr.port)) else {
                 fail(id, "invalid peer port"); return
@@ -197,10 +222,12 @@ public actor TransferEngine {
             guard await nwWaitReady(conn) else {
                 conn.cancel()
                 pConns[id] = nil
+                if Task.isCancelled || transfer(id)?.state == .paused || transfer(id)?.state == .cancelled { return }
                 // Firewalled uploader: ask the server to make them dial us.
                 await requestIndirectP(id, username: t.username)
                 return
             }
+            if Task.isCancelled || transfer(id)?.state == .paused || transfer(id)?.state == .cancelled { conn.cancel(); return }
             let me = await server.username
             try await nwSend(conn, data: PeerInitMessages.peerInit(username: me, type: "P"))
             try await nwSend(conn, data: PeerMessages.queueDownload(filename: t.filename))
@@ -334,11 +361,12 @@ public actor TransferEngine {
         var received = offset
         var buffer = pending
         while received < t.size {
-            if Task.isCancelled || transfer(id)?.state == .cancelled { conn.cancel(); return }
+            if Task.isCancelled || transfer(id)?.state == .cancelled || transfer(id)?.state == .paused { conn.cancel(); return }
             if buffer.isEmpty {
                 // 60s idle bound: a stalled uploader fails the transfer (the
                 // .partial is kept, so retry resumes) instead of hanging it.
                 guard let chunk = await nwReceiveChunk(conn, timeout: 60_000_000_000) else {
+                    if Task.isCancelled || transfer(id)?.state == .paused || transfer(id)?.state == .cancelled { conn.cancel(); return }
                     fail(id, "incomplete (\(received)/\(t.size) bytes) — retry to resume")
                     conn.cancel()
                     return
@@ -394,6 +422,9 @@ public actor TransferEngine {
     }
 
     private func fail(_ id: UUID, _ reason: String) {
+        // Late failures from torn-down connections must not overwrite an
+        // intentional pause/cancel.
+        guard let t = transfer(id), t.state != .paused, t.state != .cancelled else { return }
         update(id, force: true) { $0.state = .failed(reason) }
         teardownConns(id)
     }

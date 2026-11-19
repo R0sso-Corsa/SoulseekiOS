@@ -119,6 +119,124 @@ final class TransferEngineTests: XCTestCase {
         await conn.disconnect()
     }
 
+    /// Backgrounding: pauseAll tears down active transfers but keeps the
+    /// .partial; resumeAll re-handshakes and continues from the partial offset.
+    func testPauseAndResumeAll() async throws {
+        let server = try FakeServer()
+        let uploader = try FakeServer()
+        defer { server.close(); uploader.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+
+        let file = "@@music\\Test\\long.mp3"
+        let payload = Data((0..<65536).map { UInt8($0 % 251) })
+        let half = payload.count / 2
+        await engine.download(username: "uploader", filename: file, size: UInt64(payload.count))
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+
+        // First pass: handshake, then only the first half of the bytes.
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        _ = try uploader.readFrame() // QueueDownload
+        var treq = MessageWriter()
+        treq.u32(1); treq.u32(55); treq.string(file); treq.u64(UInt64(payload.count))
+        try uploader.send(treq.frame(code: 40))
+        _ = try uploader.readFrame() // TransferReply
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 99)
+        try uploader.accept()
+        _ = try uploader.readInitFrame() // PierceFw
+        try uploader.send(Data([55, 0, 0, 0]))
+        var offsetBuf = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &offsetBuf, 8, 0), 8)
+        try uploader.send(payload.prefix(half))
+
+        let gotHalf = await waitForTransfer(engine) { $0.received >= UInt64(half) && $0.state == .downloading }
+        let tsAtHalf = await engine.transfers
+        XCTAssertTrue(gotHalf, "never received first half: \(tsAtHalf)")
+        await engine.pauseAll()
+        let paused = await waitForTransfer(engine) { $0.state == .paused }
+        let tsPaused = await engine.transfers
+        XCTAssertTrue(paused, "pauseAll did not pause: \(tsPaused)")
+        let firstPaused = await engine.transfers.first
+        let t1 = try XCTUnwrap(firstPaused)
+        XCTAssertEqual(t1.received, UInt64(half))
+        let partialPath = dir.appendingPathComponent(file.replacingOccurrences(of: "\\", with: "_") + ".partial").path
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: partialPath)[.size] as? UInt64, UInt64(half))
+
+        // Resume: full re-handshake; the offset must equal the partial size.
+        await engine.resumeAll()
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        let queue2 = try uploader.readFrame()
+        XCTAssertEqual(queue2.code, 43)
+        var treq2 = MessageWriter()
+        treq2.u32(1); treq2.u32(77); treq2.string(file); treq2.u64(UInt64(payload.count))
+        try uploader.send(treq2.frame(code: 40))
+        _ = try uploader.readFrame()
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 123)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        try uploader.send(Data([77, 0, 0, 0]))
+        var offsetBuf2 = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &offsetBuf2, 8, 0), 8)
+        let offset2 = offsetBuf2.enumerated().reduce(UInt64(0)) { $0 | (UInt64($1.element) << (8 * $1.offset)) }
+        XCTAssertEqual(offset2, UInt64(half), "resume must continue from the partial offset")
+        try uploader.send(payload.suffix(payload.count - half))
+
+        let done = await waitForTransfer(engine, timeout: 10) { $0.state == .completed }
+        let tsDone = await engine.transfers
+        XCTAssertTrue(done, "resume did not complete: \(tsDone)")
+        let firstDone = await engine.transfers.first
+        let t2 = try XCTUnwrap(firstDone)
+        let finalPath = try XCTUnwrap(t2.localPath)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: finalPath)), payload)
+    }
+
+    /// Pausing while an indirect-P request is pending, then resuming, must
+    /// still reach a terminal state (the 60s unreachable timer must survive
+    /// the pause/resume cycle — no eternal "Connecting…").
+    func testPauseDuringIndirectPThenResumeTimesOut() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+
+        let file = "@@music\\Test\\ghost.mp3"
+        await engine.download(username: "uploader", filename: file, size: 1024)
+        // Address points at a CLOSED port → direct dial fails fast → indirect P.
+        try sendAddressReply(server, username: "uploader", port: 1)
+        let connecting = await waitForTransfer(engine) { $0.state == .connecting }
+        XCTAssertTrue(connecting, "never reached indirect-P connecting state")
+
+        await engine.pauseAll()
+        let paused = await waitForTransfer(engine) { $0.state == .paused }
+        XCTAssertTrue(paused, "did not pause")
+        await engine.resumeAll()
+        // The retry asks for the peer address again.
+        try sendAddressReply(server, username: "uploader", port: 1)
+        // No PierceFw ever arrives: must fail within the 60s bound (+ margin),
+        // not hang in connecting forever.
+        let failed = await waitForTransfer(engine, timeout: 80) {
+            if case .failed = $0.state { return true }
+            return false
+        }
+        let ts = await engine.transfers
+        XCTAssertTrue(failed, "stuck after pause/resume of indirect-P: \(ts)")
+    }
+
     /// Resume: a .partial file exists; the offset sent must equal its size and
     /// only the remaining bytes are transferred.
     func testDownloadResumesFromPartial() async throws {

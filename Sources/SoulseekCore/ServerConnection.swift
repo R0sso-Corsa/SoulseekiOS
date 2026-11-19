@@ -53,9 +53,11 @@ public actor ServerConnection {
     private var receiveTask: Task<Void, Never>?
     private var pingTask: Task<Void, Never>?
     private var loginContinuation: CheckedContinuation<Void, Never>?
-    private var addressRequests: [String: CheckedContinuation<PeerAddressReply, Error>] = [:]
-    private var statsRequests: [String: CheckedContinuation<UserStats, Error>] = [:]
-    private var statusRequests: [String: CheckedContinuation<UserStatus, Error>] = [:]
+    // Arrays: concurrent requests for the same username must ALL resolve —
+    // a single-continuation map overwrites and leaks waiters.
+    private var addressRequests: [String: [CheckedContinuation<PeerAddressReply, Error>]] = [:]
+    private var statsRequests: [String: [CheckedContinuation<UserStats, Error>]] = [:]
+    private var statusRequests: [String: [CheckedContinuation<UserStatus, Error>]] = [:]
 
     public init() {
         var continuation: AsyncStream<State>.Continuation?
@@ -172,7 +174,7 @@ public actor ServerConnection {
     public func peerAddress(for username: String) async throws -> PeerAddressReply {
         try await send(ServerMessages.getPeerAddress(username: username))
         return try await withCheckedThrowingContinuation { cont in
-            addressRequests[username] = cont
+            addressRequests[username, default: []].append(cont)
             Task {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 await self.timeoutAddressRequest(username)
@@ -181,8 +183,8 @@ public actor ServerConnection {
     }
 
     private func timeoutAddressRequest(_ username: String) async {
-        if let cont = addressRequests.removeValue(forKey: username) {
-            cont.resume(throwing: ConnectionError.addressTimeout)
+        if let conts = addressRequests.removeValue(forKey: username) {
+            for cont in conts { cont.resume(throwing: ConnectionError.addressTimeout) }
         }
     }
 
@@ -190,7 +192,7 @@ public actor ServerConnection {
     public func userStats(for username: String) async throws -> UserStats {
         try await send(ServerMessages.getUserStats(username: username))
         return try await withCheckedThrowingContinuation { cont in
-            statsRequests[username] = cont
+            statsRequests[username, default: []].append(cont)
             Task {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 await self.timeoutStatsRequest(username)
@@ -202,7 +204,7 @@ public actor ServerConnection {
     public func userStatus(for username: String) async throws -> UserStatus {
         try await send(ServerMessages.getUserStatus(username: username))
         return try await withCheckedThrowingContinuation { cont in
-            statusRequests[username] = cont
+            statusRequests[username, default: []].append(cont)
             Task {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 await self.timeoutStatusRequest(username)
@@ -211,14 +213,14 @@ public actor ServerConnection {
     }
 
     private func timeoutStatsRequest(_ username: String) async {
-        if let cont = statsRequests.removeValue(forKey: username) {
-            cont.resume(throwing: ConnectionError.addressTimeout)
+        if let conts = statsRequests.removeValue(forKey: username) {
+            for cont in conts { cont.resume(throwing: ConnectionError.addressTimeout) }
         }
     }
 
     private func timeoutStatusRequest(_ username: String) async {
-        if let cont = statusRequests.removeValue(forKey: username) {
-            cont.resume(throwing: ConnectionError.addressTimeout)
+        if let conts = statusRequests.removeValue(forKey: username) {
+            for cont in conts { cont.resume(throwing: ConnectionError.addressTimeout) }
         }
     }
 
@@ -326,18 +328,18 @@ public actor ServerConnection {
             resumeLogin()
         case 3: // GetPeerAddress reply
             if let reply = try? PeerAddressReply(payload: frame.payload),
-               let cont = addressRequests.removeValue(forKey: reply.username) {
-                cont.resume(returning: reply)
+               let conts = addressRequests.removeValue(forKey: reply.username) {
+                for cont in conts { cont.resume(returning: reply) }
             }
         case 36: // GetUserStats reply
             if let reply = try? UserStats(payload: frame.payload),
-               let cont = statsRequests.removeValue(forKey: reply.username) {
-                cont.resume(returning: reply)
+               let conts = statsRequests.removeValue(forKey: reply.username) {
+                for cont in conts { cont.resume(returning: reply) }
             }
         case 7: // GetUserStatus reply
             if let reply = try? UserStatus(payload: frame.payload),
-               let cont = statusRequests.removeValue(forKey: reply.username) {
-                cont.resume(returning: reply)
+               let conts = statusRequests.removeValue(forKey: reply.username) {
+                for cont in conts { cont.resume(returning: reply) }
             }
         case 18: // ConnectToPeer: indirect connection request; route by type
             if let request = try? ConnectToPeerRequest(payload: frame.payload) {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     private var connectionInfo: (greeting: String, publicIP: String, privileged: Bool) {
         if case .connected(let greeting, let publicIP, let privileged) = model.phase {
@@ -102,6 +103,13 @@ struct ContentView: View {
                     .glassEffect(.regular, in: .capsule)
                     .padding(.bottom, 95)
                 }
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .background: model.sceneBackgrounded()
+            case .active: model.sceneForegrounded()
+            default: break
             }
         }
     }

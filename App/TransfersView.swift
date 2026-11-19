@@ -219,10 +219,14 @@ struct TransferRow: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
-            if isFailed || transfer.state == .cancelled || isActive {
+            if transfer.state == .paused {
+                ProgressView(value: Double(transfer.received), total: Double(max(transfer.size, 1)))
+                    .tint(.secondary)
+            }
+            if isFailed || transfer.state == .cancelled || transfer.state == .paused || isActive {
                 HStack(spacing: 12) {
-                    if isFailed || transfer.state == .cancelled {
-                        Button("Retry", action: onRetry)
+                    if isFailed || transfer.state == .cancelled || transfer.state == .paused {
+                        Button(transfer.state == .paused ? "Resume" : "Retry", action: onRetry)
                             .buttonStyle(.glass)
                             .accessibilityIdentifier("retryButton")
                     }
@@ -253,6 +257,8 @@ struct TransferRow: View {
                 .font(.caption2).foregroundStyle(.secondary)
         case .downloading:
             Text("Downloading").font(.caption2).foregroundStyle(.orange)
+        case .paused:
+            Text("Paused").font(.caption2).foregroundStyle(.secondary)
         case .completed:
             Label("Completed", systemImage: "checkmark.circle.fill")
                 .font(.caption2).foregroundStyle(.green)
