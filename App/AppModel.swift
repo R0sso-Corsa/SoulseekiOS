@@ -55,7 +55,8 @@ final class AppModel {
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         let transfers = TransferEngine(server: connection, directory: documents.appendingPathComponent("Downloads"))
         transferEngine = transfers
-        browseEngine = BrowseEngine(server: connection)
+        let browse = BrowseEngine(server: connection)
+        browseEngine = browse
         shareIndex = ShareIndex(storeURL: support.appendingPathComponent("shares.json"))
         let ups = UploadEngine(server: connection, index: shareIndex)
         uploadEngine = ups
@@ -70,7 +71,8 @@ final class AppModel {
             },
             onPierce: { link, ticket, pending in
                 if await transfers.handleIndirectP(link, ticket: ticket, pending: pending) { return true }
-                return await ups.handleIndirectUpload(link, ticket: ticket, pending: pending)
+                if await ups.handleIndirectUpload(link, ticket: ticket, pending: pending) { return true }
+                return await browse.handleIndirectBrowse(link, ticket: ticket)
             },
             onListenPort: { port in
                 await coordinator.map(port)

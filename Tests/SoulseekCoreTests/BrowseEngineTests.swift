@@ -62,6 +62,63 @@ final class BrowseEngineTests: XCTestCase {
         await conn.disconnect()
     }
 
+    /// Firewalled sharer: direct dial refused → ConnectToPeer(P) → sharer
+    /// dials our listener with PierceFw → GetShareFileList → SharedFileList.
+    func testBrowseIndirectP() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let engine = BrowseEngine(server: conn)
+        let search = SearchEngine(server: conn, onPierce: { link, ticket, _ in
+            await engine.handleIndirectBrowse(link, ticket: ticket)
+        })
+        addTeardownBlock { await search.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+        await search.startListening()
+        var listenPort: UInt16 = 0
+        let portDeadline = Date().addingTimeInterval(5)
+        while Date() < portDeadline {
+            listenPort = await search.state.listenPort
+            if listenPort > 0 { break }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertGreaterThan(listenPort, 0)
+        let portFrame = try server.readFrame()
+        XCTAssertEqual(portFrame.code, 2)
+
+        async let browsing = engine.browse(username: "sharer")
+        // Online but unreachable → indirect P request.
+        try sendAddressReply(server, username: "sharer", port: 1)
+        let ctp = try server.readFrame()
+        XCTAssertEqual(ctp.code, 18)
+        var cr = MessageReader(ctp.payload)
+        let ticket = try cr.u32()
+        XCTAssertEqual(try cr.string(), "sharer")
+        XCTAssertEqual(try cr.string(), "P")
+
+        // Sharer dials our listener and pierces; we send GetShareFileList.
+        let fd = try dialListener(port: listenPort)
+        defer { Darwin.close(fd) }
+        try sendAll(fd, PeerInitMessages.pierceFirewall(ticket: ticket))
+        var reader = FrameReader()
+        var reqFrame: Frame?
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline && reqFrame == nil {
+            var buf = [UInt8](repeating: 0, count: 65536)
+            let n = recv(fd, &buf, buf.count, 0)
+            guard n > 0 else { break }
+            reader.append(Data(buf[0..<n]))
+            reqFrame = try reader.next()
+        }
+        let req = try XCTUnwrap(reqFrame)
+        XCTAssertEqual(req.code, 4)
+
+        try sendAll(fd, Data(hexString: "4300000005000000789c63646060e00662dfd2e2cce418c79ca4d25c4620979113489414252667ebe516183b3c0289313030033190cbc400010e405190c40906040000267b0afb"))
+        let folders = try await browsing
+        XCTAssertEqual(folders.count, 1)
+        XCTAssertEqual(folders[0].path, "Music\\Album")
+    }
+
     func testBrowseOfflineUser() async throws {
         let server = try FakeServer()
         defer { server.close() }
@@ -110,6 +167,35 @@ final class BrowseEngineTests: XCTestCase {
         XCTAssertEqual(st.status, .online)
         XCTAssertTrue(st.privileged)
         await conn.disconnect()
+    }
+
+    private func dialListener(port: UInt16) throws -> Int32 {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw FakeServer.Failure.socket("socket") }
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        let r = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard r == 0 else { Darwin.close(fd); throw FakeServer.Failure.socket("connect") }
+        var tv = timeval(tv_sec: 15, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        return fd
+    }
+
+    private func sendAll(_ fd: Int32, _ data: Data) throws {
+        var sent = 0
+        while sent < data.count {
+            let n = data.withUnsafeBytes { ptr in
+                Darwin.send(fd, ptr.baseAddress!.advanced(by: sent), data.count - sent, 0)
+            }
+            guard n > 0 else { throw FakeServer.Failure.socket("send") }
+            sent += n
+        }
     }
 }
 
