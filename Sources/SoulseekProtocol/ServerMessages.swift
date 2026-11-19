@@ -153,6 +153,14 @@ public enum ServerMessages {
     public static func roomList() -> Data {
         MessageWriter().frame(code: 64)
     }
+
+    /// Code 103. Wishlist search: token + query (server re-injects each interval).
+    public static func wishlistSearch(ticket: UInt32, query: String) -> Data {
+        var w = MessageWriter()
+        w.u32(ticket)
+        w.string(query)
+        return w.frame(code: 103)
+    }
 }
 
 /// Post-login handshake for a receive-only client (AD-5): no listener yet,

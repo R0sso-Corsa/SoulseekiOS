@@ -24,6 +24,7 @@ public actor ServerConnection {
         case userJoinedRoom(UserJoinedRoom)
         case userLeftRoom(UserLeftRoom)
         case roomList(RoomList)
+        case wishlistInterval(UInt64)
     }
 
     public enum ConnectionError: Error, LocalizedError {
@@ -379,6 +380,10 @@ public actor ServerConnection {
         case 64: // RoomList (post-login burst + on request)
             if let list = try? RoomList(payload: frame.payload) {
                 broadcast(.roomList(list))
+            }
+        case 104: // WishlistInterval
+            if let wi = try? WishlistInterval(payload: frame.payload) {
+                broadcast(.wishlistInterval(UInt64(wi.seconds)))
             }
         default:
             break // post-login burst (RoomList, PrivilegedUsers, …) — later slices consume these

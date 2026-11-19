@@ -81,7 +81,7 @@ public actor SearchEngine {
 
     // MARK: - Searching
 
-    public func search(_ query: String, timeout: TimeInterval = 20) async {
+    public func search(_ query: String, timeout: TimeInterval = 20, wishlist: Bool = false) async {
         timeoutTask?.cancel()
         let ticket = UInt32.random(in: 1...UInt32.max)
         state.query = query
@@ -91,7 +91,9 @@ public actor SearchEngine {
         state.finished = false
         publish()
         do {
-            try await server.send(frame: ServerMessages.fileSearch(ticket: ticket, query: query))
+            try await server.send(frame: wishlist
+                ? ServerMessages.wishlistSearch(ticket: ticket, query: query)
+                : ServerMessages.fileSearch(ticket: ticket, query: query))
         } catch {
             state.isSearching = false
             state.finished = true
