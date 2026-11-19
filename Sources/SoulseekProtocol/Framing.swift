@@ -111,6 +111,11 @@ public struct MessageReader {
 
     public mutating func u8() throws -> UInt8 { try take(1)[0] }
 
+    public mutating func u16() throws -> UInt16 {
+        let b = try take(2)
+        return UInt16(b[0]) | (UInt16(b[1]) << 8)
+    }
+
     public mutating func u32() throws -> UInt32 { leU32(try take(4)) }
 
     public mutating func u64() throws -> UInt64 {

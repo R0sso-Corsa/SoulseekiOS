@@ -89,6 +89,13 @@ public enum ServerMessages {
         w.string(username)
         return w.frame(code: 1001)
     }
+
+    /// Code 3. Resolve a peer's address; reply carries ip/port (0.0.0.0/0 = offline).
+    public static func getPeerAddress(username: String) -> Data {
+        var w = MessageWriter()
+        w.string(username)
+        return w.frame(code: 3)
+    }
 }
 
 /// Post-login handshake for a receive-only client (AD-5): no listener yet,
