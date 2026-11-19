@@ -20,6 +20,7 @@
 		49A0963DEC7F58D4762A2165 /* WishlistUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42345204484841821C430142 /* WishlistUITests.swift */; };
 		4BEED639ADEB8E26647ACF28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FA896C59EBF67275ACDD076 /* Assets.xcassets */; };
 		5997FB79AEA0A955AF53B69F /* WishlistModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */; };
+		8137581503554A3002E800D0 /* AutoLoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9662B329026A532D2B4F039 /* AutoLoginUITests.swift */; };
 		816CCAC6E593AFC2F8472CCD /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */; };
 		8B7FC377423FEDF8938FC36C /* ChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE56415029EAA10FDE2624FA /* ChatModel.swift */; };
 		97E558B40293D032B57E062D /* SharingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05522D9B8D0527B291356AF9 /* SharingUITests.swift */; };
@@ -58,6 +59,7 @@
 		469C71F2B052D3754B85DF9A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginUITests.swift; sourceTree = "<group>"; };
 		5D771E7F90F60B1F8D953E13 /* SearchModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchModel.swift; sourceTree = "<group>"; };
+		673FEB1E5C96C4B32B39A914 /* SoulseekiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SoulseekiOS.entitlements; sourceTree = "<group>"; };
 		6CAC8752410A23D728351862 /* TransfersModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersModel.swift; sourceTree = "<group>"; };
 		73FC99A775B3A411B6ACAB7F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		746AE3CD092D480A79485EBA /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
@@ -71,6 +73,7 @@
 		B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseUITests.swift; sourceTree = "<group>"; };
 		B34AB7531761603E0550DCA9 /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		BBCE411F2720855E77992687 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		C9662B329026A532D2B4F039 /* AutoLoginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoLoginUITests.swift; sourceTree = "<group>"; };
 		D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
 		DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistModel.swift; sourceTree = "<group>"; };
 		DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SoulseekiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -96,6 +99,7 @@
 		0B4DA347CD42C68A2021B584 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				C9662B329026A532D2B4F039 /* AutoLoginUITests.swift */,
 				B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */,
 				F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */,
 				301680BE77400AB4AFFFE7C9 /* FilterUITests.swift */,
@@ -150,6 +154,7 @@
 				5D771E7F90F60B1F8D953E13 /* SearchModel.swift */,
 				1D01518FCEE615528776464F /* SearchView.swift */,
 				74AEC45162387E08A99FC02F /* SharingSheet.swift */,
+				673FEB1E5C96C4B32B39A914 /* SoulseekiOS.entitlements */,
 				E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */,
 				6CAC8752410A23D728351862 /* TransfersModel.swift */,
 				9FE2208A487298B8DE1E39A6 /* TransfersView.swift */,
@@ -284,6 +289,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8137581503554A3002E800D0 /* AutoLoginUITests.swift in Sources */,
 				32EF6437B534850DF69213E1 /* BrowseUITests.swift in Sources */,
 				143C8837127414BF1AAC57F7 /* ChatUITests.swift in Sources */,
 				0FD02D8C286A25736AECDD9C /* FilterUITests.swift in Sources */,
@@ -429,6 +435,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/SoulseekiOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -458,6 +465,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/SoulseekiOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

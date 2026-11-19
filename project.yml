@@ -48,6 +48,7 @@ targets:
         SWIFT_VERSION: "6.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 83HP86VYKX
+        CODE_SIGN_ENTITLEMENTS: App/SoulseekiOS.entitlements
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   SoulseekiOSUITests:

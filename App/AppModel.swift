@@ -91,6 +91,12 @@ final class AppModel {
                 self?.apply(state)
             }
         }
+        // Saved credentials ⇒ auto-connect on launch (closing the app must
+        // not sign the user out). UI tests reset credentials and log in manually.
+        if !username.isEmpty, !password.isEmpty,
+           !CommandLine.arguments.contains("-UITestResetCredentials") {
+            connect()
+        }
     }
 
     var canConnect: Bool {

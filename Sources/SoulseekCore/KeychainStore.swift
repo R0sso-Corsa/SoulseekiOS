@@ -31,6 +31,9 @@ public struct KeychainStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: username,
             kSecValueData as String: Data(password.utf8),
+            // Readable after the first unlock so background reconnects work;
+            // never synced to iCloud.
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.unhandled(status) }
