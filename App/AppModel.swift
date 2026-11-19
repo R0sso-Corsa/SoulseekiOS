@@ -28,6 +28,8 @@ final class AppModel {
     let browseEngine: BrowseEngine
     let chatEngine: ChatEngine
     let chatModel: ChatModel
+    let wishlistEngine: WishlistEngine
+    let wishlistModel: WishlistModel
     private let connection = ServerConnection()
     private let keychain = KeychainStore()
     private var stateTask: Task<Void, Never>?
@@ -48,6 +50,11 @@ final class AppModel {
         transfersModel = TransfersModel(engine: transfers)
         chatEngine = ChatEngine(server: connection)
         chatModel = ChatModel(engine: chatEngine)
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        wishlistEngine = WishlistEngine(server: connection, searchEngine: searchEngine,
+                                        storeURL: support.appendingPathComponent("wishlist.json"))
+        wishlistModel = WishlistModel(engine: wishlistEngine)
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }

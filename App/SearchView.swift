@@ -5,6 +5,7 @@ struct SearchView: View {
     @Bindable var model: SearchModel
     var appModel: AppModel? = nil
     @State private var selectedUser: String?
+    @State private var showWishlist = false
 
     var body: some View {
         ZStack {
@@ -131,6 +132,32 @@ struct SearchView: View {
             }
         }
         .navigationTitle("Search")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 14) {
+                    Button {
+                        appModel?.wishlistModel.add(model.queryText)
+                    } label: {
+                        Image(systemName: "bookmark.plus")
+                    }
+                    .disabled(model.queryText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityIdentifier("saveWishButton")
+                    Button { showWishlist = true } label: {
+                        Image(systemName: "list.bullet")
+                    }
+                    .accessibilityIdentifier("wishlistButton")
+                }
+            }
+        }
+        .sheet(isPresented: $showWishlist) {
+            if let appModel {
+                WishlistSheet(model: appModel.wishlistModel) { query in
+                    model.queryText = query
+                    model.search()
+                    showWishlist = false
+                }
+            }
+        }
         .sheet(isPresented: Binding(
             get: { selectedUser != nil },
             set: { if !$0 { selectedUser = nil } }
