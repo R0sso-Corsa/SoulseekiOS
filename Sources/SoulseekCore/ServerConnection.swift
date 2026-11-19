@@ -26,6 +26,9 @@ public actor ServerConnection {
         case roomList(RoomList)
         case wishlistInterval(UInt64)
         case userStatus(UserStatus)
+        case roomTickers(RoomTickers)
+        case roomTickerAdded(room: String, username: String, message: String)
+        case roomTickerRemoved(room: String, username: String)
     }
 
     public enum ConnectionError: Error, LocalizedError {
@@ -369,6 +372,20 @@ public actor ServerConnection {
             if let reply = try? WatchUserReply(payload: frame.payload),
                let conts = watchRequests.removeValue(forKey: reply.username) {
                 for cont in conts { cont.resume(returning: reply) }
+            }
+        case 113: // RoomTickers (room wall snapshot)
+            if let tickers = try? RoomTickers(payload: frame.payload) {
+                broadcast(.roomTickers(tickers))
+            }
+        case 114: // RoomTickerAdded
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string(), let username = try? r.string(), let message = try? r.string() {
+                broadcast(.roomTickerAdded(room: room, username: username, message: message))
+            }
+        case 115: // RoomTickerRemoved
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string(), let username = try? r.string() {
+                broadcast(.roomTickerRemoved(room: room, username: username))
             }
         case 18: // ConnectToPeer: indirect connection request; route by type
             if let request = try? ConnectToPeerRequest(payload: frame.payload) {

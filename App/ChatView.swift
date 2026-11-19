@@ -142,6 +142,8 @@ struct ConversationView: View {
 
     @State private var draft = ""
     @State private var showSharePicker = false
+    @State private var showTickerAlert = false
+    @State private var tickerText = ""
 
     private var conv: ChatEngine.Conversation? { chatModel.conversation(id) }
     private var isRoom: Bool { id.hasPrefix("room:") }
@@ -153,6 +155,22 @@ struct ConversationView: View {
         ZStack {
             GlassBackground()
             VStack(spacing: 0) {
+                if let conv, !conv.tickers.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(conv.tickers.sorted(by: { $0.key < $1.key }), id: \.key) { user, message in
+                            Text("\(user): \(message)")
+                                .font(.caption2)
+                                .lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                    .padding(.horizontal)
+                    .padding(.top, 4)
+                    .accessibilityIdentifier("tickerWall")
+                }
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 8) {
@@ -180,6 +198,13 @@ struct ConversationView: View {
         .toolbar {
             if isRoom {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button("Ticker") {
+                        tickerText = conv?.tickers[appModel.username] ?? ""
+                        showTickerAlert = true
+                    }
+                    .accessibilityIdentifier("setTickerButton")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Search room") {
                         let q = appModel.searchModel.queryText.trimmingCharacters(in: .whitespaces)
                         appModel.searchModel.searchInRoom(name, query: q.isEmpty ? "*" : q)
@@ -201,6 +226,18 @@ struct ConversationView: View {
                 chatModel.share(MusicCard(username: username, path: file.path, size: file.size), to: id)
                 showSharePicker = false
             }
+        }
+        .alert("Room ticker", isPresented: $showTickerAlert) {
+            TextField("Your wall message", text: $tickerText)
+                .accessibilityIdentifier("tickerField")
+            Button("Set") {
+                chatModel.setTicker(in: name, message: tickerText.trimmingCharacters(in: .whitespaces))
+            }
+            .accessibilityIdentifier("tickerSetButton")
+            Button("Remove") { chatModel.setTicker(in: name, message: "") }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("A short message pinned to the room wall for everyone to see.")
         }
     }
 

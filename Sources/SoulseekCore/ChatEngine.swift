@@ -39,6 +39,7 @@ public actor ChatEngine {
         public var messages: [ChatMessage] = []
         public var members: [RoomMember] = []
         public var owner: String?
+        public var tickers: [String: String] = [:]
         public var lastActivity = Date()
     }
 
@@ -92,6 +93,23 @@ public actor ChatEngine {
         guard !text.isEmpty else { return }
         try? await server.send(frame: ServerMessages.sayInRoom(room: room, message: text))
         // The server echoes our own room message back via code 13.
+    }
+
+    /// Set our room-wall ticker (116); empty message removes it. Applied
+    /// locally too — the server echoes changes to OTHERS via 114/115 but
+    /// may not echo our own back to us.
+    public func setTicker(in room: String, message: String) async {
+        try? await server.send(frame: ServerMessages.setRoomTicker(room: room, message: message))
+        if var conv = conversation("room:\(room)") {
+            let me = await server.username
+            if message.isEmpty {
+                conv.tickers[me] = nil
+            } else {
+                conv.tickers[me] = message
+            }
+            upsert(conv)
+            publish()
+        }
     }
 
     public func requestRoomList() async {
@@ -161,6 +179,24 @@ public actor ChatEngine {
                 }
             case .roomList(let list):
                 roomList = list
+            case .roomTickers(let tickers):
+                if var conv = conversation("room:\(tickers.room)") {
+                    conv.tickers = Dictionary(uniqueKeysWithValues: tickers.entries.map { ($0.username, $0.message) })
+                    upsert(conv)
+                    publish()
+                }
+            case .roomTickerAdded(let room, let username, let message):
+                if var conv = conversation("room:\(room)") {
+                    conv.tickers[username] = message
+                    upsert(conv)
+                    publish()
+                }
+            case .roomTickerRemoved(let room, let username):
+                if var conv = conversation("room:\(room)") {
+                    conv.tickers[username] = nil
+                    upsert(conv)
+                    publish()
+                }
             default:
                 break
             }

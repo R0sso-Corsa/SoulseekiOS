@@ -42,6 +42,10 @@ final class ChatModel {
         Task { await engine.say(in: room, text: text) }
     }
 
+    func setTicker(in room: String, message: String) {
+        Task { await engine.setTicker(in: room, message: message) }
+    }
+
     func share(_ card: MusicCard, to conversationID: String) {
         Task { await engine.shareMusic(card, to: conversationID) }
     }

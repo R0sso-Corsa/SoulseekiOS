@@ -177,6 +177,59 @@ final class ChatEngineTests: XCTestCase {
         var jr = MessageReader(join.payload)
         XCTAssertEqual(try jr.string(), "jazz")
     }
+
+    /// Room wall: 113 snapshot, 114 add, 115 remove, 116 set.
+    func testRoomTickers() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server)
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        await chat.joinRoom("jazz")
+        _ = try server.readFrame()
+        try server.send(Data(hexString: "040000006a617a7a0200000005000000616c69636503000000626f6202000000020000000100000002000000e80300000500000000000000640000000a000000d00700000900000000000000c80000001400000002000000000000000100000002000000020000005553020000004445").framePayloadAsCode(14))
+        _ = await waitFor(chat) { $0.contains { $0.id == "room:jazz" && $0.members.count == 2 } }
+
+        // Snapshot (113): one ticker from alice.
+        var snap = MessageWriter()
+        snap.string("jazz")
+        snap.u32(1)
+        snap.string("alice")
+        snap.string("welcome to jazz")
+        try server.send(snap.frame(code: 113))
+        let gotSnap = await waitFor(chat) { convs in
+            convs.first { $0.id == "room:jazz" }?.tickers["alice"] == "welcome to jazz"
+        }
+        XCTAssertTrue(gotSnap, "ticker snapshot not applied")
+
+        // Add (114): bob's ticker.
+        var add = MessageWriter()
+        add.string("jazz"); add.string("bob"); add.string("hello wall")
+        try server.send(add.frame(code: 114))
+        let gotAdd = await waitFor(chat) { convs in
+            convs.first { $0.id == "room:jazz" }?.tickers["bob"] == "hello wall"
+        }
+        XCTAssertTrue(gotAdd, "ticker add not applied")
+
+        // Remove (115): alice's ticker.
+        var rem = MessageWriter()
+        rem.string("jazz"); rem.string("alice")
+        try server.send(rem.frame(code: 115))
+        let gotRem = await waitFor(chat) { convs in
+            convs.first { $0.id == "room:jazz" }?.tickers["alice"] == nil
+        }
+        XCTAssertTrue(gotRem, "ticker remove not applied")
+
+        // Set (116): our own ticker goes out with room + message.
+        await chat.setTicker(in: "jazz", message: "my ticker")
+        let set = try server.readFrame()
+        XCTAssertEqual(set.code, 116)
+        var sr = MessageReader(set.payload)
+        XCTAssertEqual(try sr.string(), "jazz")
+        XCTAssertEqual(try sr.string(), "my ticker")
+    }
 }
 
 private extension Data {
