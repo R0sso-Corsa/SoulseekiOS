@@ -15,6 +15,29 @@ struct ContentView: View {
         return false
     }
 
+    private var hasCredentials: Bool {
+        !model.username.isEmpty && !model.password.isEmpty
+    }
+
+    /// The login form appears only when there is nothing to restore: first
+    /// launch, sign-out, kick, or a manual login still in progress. Restored
+    /// sessions and mid-use reconnects stay in the app with a status banner.
+    private var showLogin: Bool {
+        if case .kicked = model.phase { return true }
+        if !hasCredentials { return true }
+        if model.userDisconnect { return true }
+        return !model.restoringSession && !model.hasConnected
+    }
+
+    private var bannerText: String? {
+        guard hasCredentials, !isConnected, !showLogin else { return nil }
+        switch model.phase {
+        case .connecting: return "Connecting…"
+        case .failed(let reason): return reason
+        default: return "Reconnecting…"
+        }
+    }
+
     var body: some View {
         // TabView stays mounted across reconnects so the selected tab (and
         // each tab's navigation state) survives transient drops.
@@ -49,14 +72,36 @@ struct ContentView: View {
                 .tag(3)
             }
             .tint(.orange)
-            .opacity(isConnected ? 1 : 0)
+            .opacity(showLogin ? 0 : 1)
             .allowsHitTesting(isConnected)
 
-            if !isConnected {
+            if showLogin {
                 NavigationStack {
                     LoginView(model: model)
                 }
                 .tint(.orange)
+            }
+
+            if let text = bannerText {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 8) {
+                        if case .connecting = model.phase {
+                            ProgressView().controlSize(.small)
+                        }
+                        Text(text)
+                            .font(.footnote)
+                            .accessibilityIdentifier("connectionBanner")
+                        if case .failed = model.phase {
+                            Button("Sign out") { model.signOut() }
+                                .font(.footnote.weight(.semibold))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .glassEffect(.regular, in: .capsule)
+                    .padding(.bottom, 95)
+                }
             }
         }
     }

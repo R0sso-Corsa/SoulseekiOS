@@ -27,6 +27,19 @@ extension XCUIApplication {
         }
     }
 
+    /// Open a chip menu and select an item, retrying the whole sequence if
+    /// the menu dismisses itself or the tap doesn't register.
+    func selectMenuItem(_ chipLabel: String, item: String) {
+        for _ in 0..<3 {
+            openMenu(chipLabel, item: item)
+            let btn = buttons[item]
+            if btn.waitForExistence(timeout: 2) {
+                btn.tap()
+                if !btn.waitForExistence(timeout: 2) { return }
+            }
+        }
+    }
+
     /// Wait out a transient disconnect (login overlay), then return to a tab.
     func waitForReconnect(tab: String) {
         if textFields["usernameField"].exists {

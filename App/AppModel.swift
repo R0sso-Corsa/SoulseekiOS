@@ -40,8 +40,11 @@ final class AppModel {
     private var stateTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
     private var reconnectDelay: UInt64 = 2
-    private var userDisconnect = false
-    private var hasConnected = false
+    private(set) var userDisconnect = false
+    private(set) var hasConnected = false
+    /// True when credentials were restored from the Keychain at launch — the
+    /// app must reconnect in place, never flash the login form.
+    private(set) var restoringSession = false
 
     init() {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -84,6 +87,7 @@ final class AppModel {
         if let saved = try? keychain.load() {
             username = saved.username
             password = saved.password
+            restoringSession = true
         }
         stateTask = Task { [weak self] in
             guard let stream = self?.connection.states else { return }

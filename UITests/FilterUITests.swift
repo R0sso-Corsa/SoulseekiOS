@@ -40,24 +40,17 @@ final class FilterUITests: XCTestCase {
 
         // --- Bit depth filter: 24-bit+ ---
         XCTAssertTrue(app.buttons["Depth"].waitForExistence(timeout: 5), "Depth chip missing")
-        app.openMenu("Depth", item: "24-bit+")
-        let depthOption = app.buttons["24-bit+"]
-        XCTAssertTrue(depthOption.waitForExistence(timeout: 5), "24-bit+ menu item missing")
-        depthOption.tap()
+        app.selectMenuItem("Depth", item: "24-bit+")
         let depthText = app.staticTexts["fileBitDepth"].firstMatch
         XCTAssertTrue(depthText.waitForExistence(timeout: 20), "no files with bit depth shown after 24-bit+ filter")
         XCTAssertTrue(["24-bit", "32-bit"].contains(depthText.label),
                       "filtered row shows unexpected bit depth: \(depthText.label)")
         // Reset depth so the bitrate step sees results again (chip now reads "24+").
-        app.openMenu("24+", item: "Any depth")
-        app.buttons["Any depth"].tap()
+        app.selectMenuItem("24+", item: "Any depth")
 
         // --- Custom minimum bitrate: 1000 kbps (beyond the 320 preset) ---
         XCTAssertTrue(app.buttons["Bitrate"].waitForExistence(timeout: 5), "Bitrate chip missing")
-        app.openMenu("Bitrate", item: "Custom…")
-        let customItem = app.buttons["Custom…"]
-        XCTAssertTrue(customItem.waitForExistence(timeout: 5), "Custom… menu item missing")
-        customItem.tap()
+        app.selectMenuItem("Bitrate", item: "Custom…")
         let alert = app.alerts["Custom min bitrate"]
         XCTAssertTrue(alert.waitForExistence(timeout: 5), "custom bitrate alert missing")
         let field = alert.textFields.firstMatch

@@ -24,17 +24,14 @@ final class AutoLoginUITests: XCTestCase {
         XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 40), "first login failed")
         app.terminate()
 
-        // Second launch: no reset argument — the app must auto-connect.
+        // Second launch: no reset argument — the app must restore the session
+        // WITHOUT showing the login form, and reach connected on its own.
         let app2 = XCUIApplication()
         app2.launch()
-        let autoLoggedIn = app2.textFields["usernameField"].waitForNonExistence(timeout: 40)
-        if !autoLoggedIn {
-            let shot = XCUIScreen.main.screenshot()
-            let att = XCTAttachment(screenshot: shot)
-            att.name = "autologin-FAILURE"
-            att.lifetime = .keepAlways
-            add(att)
-        }
-        XCTAssertTrue(autoLoggedIn, "relaunch showed the login screen — saved credentials did not auto-connect")
+        XCTAssertFalse(app2.textFields["usernameField"].exists,
+                       "login screen flashed on relaunch — session should restore in place")
+        app2.tapTab("Status")
+        XCTAssertTrue(app2.staticTexts["connectedLabel"].waitForExistence(timeout: 40),
+                      "session did not auto-restore to connected")
     }
 }
