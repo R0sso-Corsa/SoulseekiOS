@@ -80,7 +80,10 @@ final class ChatUITests: XCTestCase {
         att.lifetime = .keepAlways
         add(att)
 
-        // Leave the room to clean up.
-        app.buttons["leaveRoomButton"].tap()
+        // Leave the room to clean up (via the ⋯ actions menu).
+        app.buttons["roomActionsMenu"].tap()
+        let leave = app.buttons["leaveRoomButton"]
+        XCTAssertTrue(leave.waitForExistence(timeout: 5), "leave action missing")
+        leave.tap()
     }
 }

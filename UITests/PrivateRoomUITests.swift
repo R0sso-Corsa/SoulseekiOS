@@ -46,14 +46,9 @@ final class PrivateRoomUITests: XCTestCase {
         nameField.typeText(room)
         alert.buttons.matching(identifier: "Create").firstMatch.tap()
 
-        // Private room → Manage button appears once the join reply lands.
-        // With 4 toolbar items iOS may overflow some into "More".
+        // Private room → Manage is a dedicated toolbar button (never overflowed).
         let manage = app.buttons["manageRoomButton"]
-        if !manage.waitForExistence(timeout: 25) {
-            let more = app.buttons["More"]
-            if more.waitForExistence(timeout: 3) { more.tap() }
-        }
-        XCTAssertTrue(manage.waitForExistence(timeout: 5), "Manage button missing — room not private?")
+        XCTAssertTrue(manage.waitForExistence(timeout: 25), "Manage button missing — room not private?")
         manage.tap()
 
         // Invite the probe account.

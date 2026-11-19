@@ -34,12 +34,13 @@ final class TickerUITests: XCTestCase {
         roomField.typeText(roomName)
         app.alerts.buttons["Join / Create"].firstMatch.tap()
 
-        // Set a ticker via the room toolbar.
+        // Set a ticker via the room actions menu (⋯).
         let tickerButton = app.buttons["setTickerButton"]
-        XCTAssertTrue(tickerButton.waitForExistence(timeout: 15), "room view missing ticker action")
         let alert = app.alerts["Room ticker"]
         for _ in 0..<3 {
-            tickerButton.tap()
+            let menu = app.buttons["roomActionsMenu"]
+            if menu.waitForExistence(timeout: 10) { menu.tap() }
+            if tickerButton.waitForExistence(timeout: 5) { tickerButton.tap() }
             if alert.waitForExistence(timeout: 3) { break }
         }
         XCTAssertTrue(alert.exists, "ticker alert did not open")

@@ -248,31 +248,34 @@ struct ConversationView: View {
                         .accessibilityIdentifier("manageRoomButton")
                     }
                 }
+                // One menu for the rest — 4 separate toolbar buttons overflow
+                // into "More" on phones and can hide Manage entirely.
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Ticker") {
-                        tickerText = conv?.tickers[appModel.username] ?? ""
-                        showTickerAlert = true
-                    }
-                    .accessibilityIdentifier("setTickerButton")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Search room") {
-                        let q = appModel.searchModel.queryText.trimmingCharacters(in: .whitespaces)
-                        appModel.searchModel.searchInRoom(name, query: q.isEmpty ? "*" : q)
-                        appModel.selectedTab = 0
-                    }
-                    .accessibilityIdentifier("searchRoomButton")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Leave") {
-                        if isPrivateRoom {
-                            chatModel.leavePrivateRoom(name)
-                        } else {
-                            chatModel.leaveRoom(name)
+                    Menu {
+                        Button("Ticker") {
+                            tickerText = conv?.tickers[appModel.username] ?? ""
+                            showTickerAlert = true
                         }
-                        dismiss()
+                        .accessibilityIdentifier("setTickerButton")
+                        Button("Search room") {
+                            let q = appModel.searchModel.queryText.trimmingCharacters(in: .whitespaces)
+                            appModel.searchModel.searchInRoom(name, query: q.isEmpty ? "*" : q)
+                            appModel.selectedTab = 0
+                        }
+                        .accessibilityIdentifier("searchRoomButton")
+                        Button("Leave", role: .destructive) {
+                            if isPrivateRoom {
+                                chatModel.leavePrivateRoom(name)
+                            } else {
+                                chatModel.leaveRoom(name)
+                            }
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("leaveRoomButton")
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                    .accessibilityIdentifier("leaveRoomButton")
+                    .accessibilityIdentifier("roomActionsMenu")
                 }
             }
         }
