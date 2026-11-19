@@ -52,6 +52,9 @@ public actor ChatEngine {
     public private(set) var roomError: String?
     /// Whether we accept private-room invitations (EnableRoomInvitations 141).
     public private(set) var invitationsEnabled = true
+    /// Names we asked to CREATE as private — if the join reply has no owner,
+    /// the name already existed as a public room (server silently joins it).
+    private var pendingPrivateCreates: Set<String> = []
     public nonisolated let updates: AsyncStream<[Conversation]>
     private let updatesContinuation: AsyncStream<[Conversation]>.Continuation
 
@@ -90,6 +93,7 @@ public actor ChatEngine {
     public func joinRoom(_ name: String, private isPrivate: Bool = false) async {
         guard Self.isValidRoomName(name) else { return }
         roomError = nil
+        if isPrivate { pendingPrivateCreates.insert(name) }
         try? await server.send(frame: ServerMessages.joinRoom(room: name, type: isPrivate ? 1 : 0))
     }
 
@@ -236,6 +240,13 @@ public actor ChatEngine {
                 conv.privateMembers = rj.members.map(\.username)
                 upsert(conv)
                 system("room:\(rj.room)", kind: .room, name: rj.room, "Joined \(rj.room)")
+                if pendingPrivateCreates.remove(rj.room) != nil && rj.owner == nil {
+                    // Asked to create private, but the name already existed as
+                    // a PUBLIC room — the server joined us to it instead.
+                    roomError = "\"\(rj.room)\" is already a public group. Private groups need a name that isn't taken."
+                    system("room:\(rj.room)", kind: .room, name: rj.room,
+                           "⚠️ This group is PUBLIC — the name was already taken. Go back and create a private group with a new name.")
+                }
             case .roomLeft(let room):
                 conversations.removeAll { $0.id == "room:\(room)" }
                 publish()
@@ -337,6 +348,7 @@ public actor ChatEngine {
                     publish()
                 }
             case .cantCreateRoom(let room):
+                pendingPrivateCreates.remove(room)
                 roomError = "Couldn't create \"\(room)\" — the name is used by a private group."
                 publish()
             default:

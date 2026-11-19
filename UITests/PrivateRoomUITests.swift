@@ -79,6 +79,47 @@ final class PrivateRoomUITests: XCTestCase {
         XCTAssertTrue(app.buttons["newChatButton"].waitForExistence(timeout: 15), "did not return to chat list")
     }
 
+    /// Creating a "private" group with an existing PUBLIC group's name must
+    /// show a warning, not silently open a public room without Manage.
+    @MainActor
+    func testPrivateCreateCollisionShowsWarning() throws {
+        let app = try launchAndLogin()
+        app.tapTab("Chat")
+        let room = "SlskCol" + String(Int.random(in: 1000...9999))
+
+        // 1. Create the name as a PUBLIC group.
+        let plus = app.buttons["newChatButton"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 10))
+        plus.tap()
+        app.buttons["Create / join group"].tap()
+        let pubAlert = app.alerts["Create or join a group"]
+        XCTAssertTrue(pubAlert.waitForExistence(timeout: 10))
+        pubAlert.textFields.firstMatch.tap()
+        pubAlert.textFields.firstMatch.typeText(room)
+        pubAlert.buttons.matching(identifier: "Join / Create").firstMatch.tap()
+        XCTAssertTrue(app.buttons["roomActionsMenu"].waitForExistence(timeout: 25), "public room view missing")
+
+        // Leave it (⋯ → Leave).
+        app.buttons["roomActionsMenu"].tap()
+        let leave = app.buttons["leaveRoomButton"]
+        XCTAssertTrue(leave.waitForExistence(timeout: 5))
+        leave.tap()
+        XCTAssertTrue(plus.waitForExistence(timeout: 15), "did not return to chat list")
+
+        // 2. "Create private" with the SAME name → warning in the room.
+        plus.tap()
+        app.buttons["Create private group"].tap()
+        let privAlert = app.alerts["Create a private group"]
+        XCTAssertTrue(privAlert.waitForExistence(timeout: 10))
+        privAlert.textFields.firstMatch.tap()
+        privAlert.textFields.firstMatch.typeText(room)
+        privAlert.buttons.matching(identifier: "Create").firstMatch.tap()
+
+        let warning = app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'PUBLIC'")).firstMatch
+        XCTAssertTrue(warning.waitForExistence(timeout: 25), "collision warning never appeared")
+        XCTAssertFalse(app.buttons["manageRoomButton"].exists, "public collision room must not show Manage")
+    }
+
     @MainActor
     func testRoomSearchFilters() throws {
         let app = try launchAndLogin()

@@ -334,6 +334,35 @@ final class ChatEngineTests: XCTestCase {
         let gotRevoked = await waitFor(chat) { !$0.contains { $0.id == "room:vault" } }
         XCTAssertTrue(gotRevoked, "revocation did not remove the room")
     }
+
+    /// "Create private" with a name that already exists as a PUBLIC room:
+    /// the server replies with a public join (no owner) — must surface an
+    /// error + in-room warning instead of silently showing a public room.
+    func testPrivateCreateCollisionWithPublicRoom() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server)
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        await chat.joinRoom("jazz", private: true)
+        let join = try server.readFrame()
+        XCTAssertEqual(join.code, 14)
+        var jr = MessageReader(join.payload)
+        XCTAssertEqual(try jr.string(), "jazz")
+        XCTAssertEqual(try jr.u32(), 1)
+        // Public join reply (no owner suffix).
+        try server.send(Data(hexString: "040000006a617a7a0200000005000000616c69636503000000626f6202000000020000000100000002000000e80300000500000000000000640000000a000000d00700000900000000000000c80000001400000002000000000000000100000002000000020000005553020000004445").framePayloadAsCode(14))
+        let warned = await waitFor(chat) { convs in
+            convs.contains { $0.id == "room:jazz" && $0.messages.contains { $0.text.contains("PUBLIC") } }
+        }
+        XCTAssertTrue(warned, "collision warning missing")
+        let err = await chat.roomError
+        XCTAssertNotNil(err, "roomError not set on private-create collision")
+        let conv = await chat.conversations.first { $0.id == "room:jazz" }
+        XCTAssertEqual(conv?.isPrivate, false)
+    }
 }
 
 private extension Data {

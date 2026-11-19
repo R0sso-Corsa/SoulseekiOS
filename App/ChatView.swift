@@ -177,6 +177,7 @@ struct ConversationView: View {
     @State private var tickerText = ""
     @State private var showManage = false
     @State private var hadConv = false
+    @State private var joinTimedOut = false
 
     private var conv: ChatEngine.Conversation? { chatModel.conversation(id) }
     private var isRoom: Bool { id.hasPrefix("room:") }
@@ -189,6 +190,14 @@ struct ConversationView: View {
         ZStack {
             GlassBackground()
             VStack(spacing: 0) {
+                if conv == nil && joinTimedOut {
+                    Text("Couldn't join this group. Go back and try again, or pick a different name.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .accessibilityIdentifier("joinFailedNote")
+                }
                 if let conv, !conv.tickers.isEmpty {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(conv.tickers.sorted(by: { $0.key < $1.key }), id: \.key) { user, message in
@@ -229,6 +238,10 @@ struct ConversationView: View {
         }
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            if conv == nil { joinTimedOut = true }
+        }
         .onChange(of: conv?.id) { _, newID in
             // Pop when the room disappears (left, disbanded, membership revoked)
             // — but not before the initial join reply arrives.
