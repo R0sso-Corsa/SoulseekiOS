@@ -102,6 +102,13 @@ public struct MessageReader {
 
     public var remaining: Int { bytes.count - pos }
 
+    /// Consume and return all remaining bytes.
+    public mutating func rest() -> Data {
+        let r = Data(bytes[pos...])
+        pos = bytes.count
+        return r
+    }
+
     private mutating func take(_ n: Int) throws -> [UInt8] {
         guard pos + n <= bytes.count else { throw CodecError.truncated }
         let out = Array(bytes[pos..<pos + n])

@@ -96,6 +96,20 @@ public enum ServerMessages {
         w.string(username)
         return w.frame(code: 3)
     }
+
+    /// Code 36. Request a user's upload stats (reply: UserStats).
+    public static func getUserStats(username: String) -> Data {
+        var w = MessageWriter()
+        w.string(username)
+        return w.frame(code: 36)
+    }
+
+    /// Code 7. Request a user's online/away status (reply: UserStatus).
+    public static func getUserStatus(username: String) -> Data {
+        var w = MessageWriter()
+        w.string(username)
+        return w.frame(code: 7)
+    }
 }
 
 /// Post-login handshake for a receive-only client (AD-5): no listener yet,

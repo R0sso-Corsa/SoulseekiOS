@@ -43,6 +43,11 @@ public enum PeerMessages {
     public static func userInfoRequest() -> Data {
         MessageWriter().frame(code: 15)
     }
+
+    /// Code 4. Ask a peer for their shared file list (empty payload).
+    public static func sharedFileListRequest() -> Data {
+        MessageWriter().frame(code: 4)
+    }
 }
 
 /// PeerTransferRequest (40) received from an uploader when a slot frees.
