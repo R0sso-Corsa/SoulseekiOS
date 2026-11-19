@@ -32,6 +32,11 @@ final class FilterUITests: XCTestCase {
         searchField.typeText("flac")
         app.buttons["searchButton"].tap()
         XCTAssertTrue(app.staticTexts["resultFilename"].firstMatch.waitForExistence(timeout: 90), "no search results")
+        let initialShot = XCUIScreen.main.screenshot()
+        let initialAtt = XCTAttachment(screenshot: initialShot)
+        initialAtt.name = "filters-INITIAL"
+        initialAtt.lifetime = .keepAlways
+        add(initialAtt)
 
         // --- Bit depth filter: 24-bit+ ---
         XCTAssertTrue(app.buttons["Depth"].waitForExistence(timeout: 5), "Depth chip missing")

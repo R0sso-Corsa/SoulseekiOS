@@ -26,7 +26,9 @@ struct GlassChipLabel: View {
     var body: some View {
         Label(title, systemImage: systemImage)
             .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 14)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .glassEffect(
                 .regular.tint(selected ? Color.orange.opacity(0.45) : .clear).interactive(),

@@ -21,6 +21,7 @@ struct SearchView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
                             .glassEffect(.regular.interactive(), in: .capsule)
+                            .frame(height: 44)
                             .accessibilityIdentifier("searchField")
                             .onSubmit { model.search() }
                         Button {
@@ -28,9 +29,13 @@ struct SearchView: View {
                         } label: {
                             Image(systemName: model.isSearching ? "stop.fill" : "magnifyingglass")
                                 .font(.body.weight(.semibold))
-                                .padding(12)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .glassEffect(.regular.tint(Color.orange.opacity(0.85)).interactive(), in: .capsule)
+                                .frame(height: 44)
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.plain)
                         .disabled(model.queryText.trimmingCharacters(in: .whitespaces).isEmpty && !model.isSearching)
                         .accessibilityIdentifier("searchButton")
                         .accessibilityLabel(model.isSearching ? "Stop" : "Search")
@@ -39,8 +44,9 @@ struct SearchView: View {
                 .padding(.horizontal)
                 .padding(.top, 4)
 
-                GlassEffectContainer(spacing: 8) {
-                    HStack(spacing: 8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer(spacing: 6) {
+                        HStack(spacing: 6) {
                         Menu {
                             Picker("Min bitrate", selection: $model.minBitrate) {
                                 Text("Any bitrate").tag(0)
@@ -93,10 +99,10 @@ struct SearchView: View {
                                 selected: model.minBitDepth > 0
                             )
                         }
-                        Spacer()
+                        }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
 
                 HStack {
                     HStack(spacing: 6) {
