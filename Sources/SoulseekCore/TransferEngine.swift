@@ -35,6 +35,7 @@ public actor TransferEngine {
     private let server: ServerConnection
     private let directory: URL
     private var eventTask: Task<Void, Never>?
+    private var serverEventTask: Task<Void, Never>?
     private var pConns: [UUID: NWConnection] = [:]
     private var fConns: [UUID: NWConnection] = [:]
     private var runTasks: [UUID: Task<Void, Never>] = [:]
@@ -51,6 +52,22 @@ public actor TransferEngine {
         updatesContinuation = cont!
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         eventTask = Task { await self.consumeFileEvents() }
+        serverEventTask = Task { await self.consumeServerEvents() }
+    }
+
+    /// CannotConnect for a pending indirect-P request → fail fast instead of
+    /// waiting out the 60s timer (the peer tried to dial us and couldn't).
+    private func consumeServerEvents() async {
+        let stream = await server.makeEventStream()
+        for await event in stream {
+            if Task.isCancelled { return }
+            if case .cannotConnect(let ticket) = event,
+               let id = pendingP.removeValue(forKey: ticket) {
+                pWaitTasks[id]?.cancel()
+                pWaitTasks[id] = nil
+                fail(id, "user unreachable (both firewalled?)")
+            }
+        }
     }
 
     deinit {
@@ -91,6 +108,8 @@ public actor TransferEngine {
     public func shutdown() async {
         eventTask?.cancel()
         eventTask = nil
+        serverEventTask?.cancel()
+        serverEventTask = nil
         for id in Array(runTasks.keys) { teardownConns(id) }
     }
 
