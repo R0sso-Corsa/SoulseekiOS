@@ -92,7 +92,8 @@ public actor TransferEngine {
     }
 
     /// Direct F connection handed off from the shared listener (reachable networks).
-    public func handleDirectFile(_ conn: NWConnection, pending: Data) async {
+    public func handleDirectFile(_ link: PeerLink, pending: Data) async {
+        let conn = link.connection
         var buf = pending
         while buf.count < 4 {
             guard let chunk = await nwReceiveChunk(conn) else { conn.cancel(); return }

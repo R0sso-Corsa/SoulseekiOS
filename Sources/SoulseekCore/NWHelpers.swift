@@ -1,6 +1,15 @@
 import Foundation
 import Network
 
+/// NWConnection is thread-safe (Network.framework) but not annotated Sendable.
+/// This box lets links cross actor boundaries under Swift 6 region isolation.
+public struct PeerLink: @unchecked Sendable {
+    public let connection: NWConnection
+    public init(_ connection: NWConnection) {
+        self.connection = connection
+    }
+}
+
 /// Shared NWConnection bridges (actor callers hop back via await).
 /// Extraction per AD-11; ServerConnection/SearchEngine keep their inline
 /// copies until the full PeerConnections refactor.

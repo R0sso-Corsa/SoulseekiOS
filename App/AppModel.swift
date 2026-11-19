@@ -22,13 +22,21 @@ final class AppModel {
 
     let searchEngine: SearchEngine
     let searchModel: SearchModel
+    let transferEngine: TransferEngine
+    let transfersModel: TransfersModel
     private let connection = ServerConnection()
     private let keychain = KeychainStore()
     private var stateTask: Task<Void, Never>?
 
     init() {
-        searchEngine = SearchEngine(server: connection)
-        searchModel = SearchModel(engine: searchEngine)
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let transfers = TransferEngine(server: connection, directory: documents.appendingPathComponent("Downloads"))
+        transferEngine = transfers
+        searchEngine = SearchEngine(server: connection) { link, pending in
+            await transfers.handleDirectFile(link, pending: pending)
+        }
+        searchModel = SearchModel(engine: searchEngine, transferEngine: transfers)
+        transfersModel = TransfersModel(engine: transfers)
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }

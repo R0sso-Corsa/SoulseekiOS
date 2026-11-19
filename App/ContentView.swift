@@ -22,6 +22,10 @@ struct ContentView: View {
                     )
                 }
                 .tabItem { Label("Status", systemImage: "person.crop.circle") }
+                NavigationStack {
+                    TransfersView(model: model.transfersModel)
+                }
+                .tabItem { Label("Transfers", systemImage: "arrow.down.circle") }
             }
             .tint(.orange)
         default:

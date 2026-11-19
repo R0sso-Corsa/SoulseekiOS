@@ -19,7 +19,16 @@ public actor ServerConnection {
         case cannotConnect(ticket: UInt32)
     }
 
-    public enum ConnectionError: Error { case notConnected, addressTimeout }
+    public enum ConnectionError: Error, LocalizedError {
+        case notConnected, addressTimeout
+
+        public var errorDescription: String? {
+            switch self {
+            case .notConnected: return "Not connected to the server"
+            case .addressTimeout: return "Couldn't reach the user (address lookup timed out)"
+            }
+        }
+    }
 
     public private(set) var state: State = .disconnected
     public private(set) var username = ""

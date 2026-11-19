@@ -85,7 +85,9 @@ struct SearchView: View {
                     ForEach(model.groups) { group in
                         Section {
                             ForEach(group.files, id: \.path) { file in
-                                FileRow(file: file)
+                                FileRow(file: file) {
+                                    model.download(file, from: group.username)
+                                }
                             }
                         } header: {
                             VStack(alignment: .leading, spacing: 2) {
@@ -126,22 +128,36 @@ struct SearchView: View {
 
 struct FileRow: View {
     let file: FileEntry
+    var onDownload: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(file.filename)
-                .font(.subheadline)
-                .lineLimit(2)
-                .accessibilityIdentifier("resultFilename")
-            HStack(spacing: 6) {
-                Text(file.ext.uppercased())
-                if let bitrate = file.bitrate, bitrate > 0 { Text("\(bitrate) kbps") }
-                if let sampleRate = file.sampleRate { Text("\(sampleRate / 1000) kHz") }
-                if let duration = file.duration { Text(durationText(duration)) }
-                Text(sizeText(file.size))
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(file.filename)
+                    .font(.subheadline)
+                    .lineLimit(2)
+                    .accessibilityIdentifier("resultFilename")
+                HStack(spacing: 6) {
+                    Text(file.ext.uppercased())
+                    if let bitrate = file.bitrate, bitrate > 0 { Text("\(bitrate) kbps") }
+                    if let sampleRate = file.sampleRate { Text("\(sampleRate / 1000) kHz") }
+                    if let duration = file.duration { Text(durationText(duration)) }
+                    Text(sizeText(file.size))
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            Spacer()
+            if let onDownload {
+                Button(action: onDownload) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("downloadButton")
+                .accessibilityLabel("Download \(file.filename)")
+            }
         }
     }
 

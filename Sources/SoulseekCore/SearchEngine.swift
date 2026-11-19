@@ -29,9 +29,9 @@ public actor SearchEngine {
     private var peerTasks: [UUID: Task<Void, Never>] = [:]
     private var peerConns: [UUID: NWConnection] = [:]
 
-    private let onFileConnection: ((NWConnection, Data) async -> Void)?
+    private let onFileConnection: (@Sendable (PeerLink, Data) async -> Void)?
 
-    public init(server: ServerConnection, onFileConnection: ((NWConnection, Data) async -> Void)? = nil) {
+    public init(server: ServerConnection, onFileConnection: (@Sendable (PeerLink, Data) async -> Void)? = nil) {
         self.server = server
         self.onFileConnection = onFileConnection
         var continuation: AsyncStream<State>.Continuation?
@@ -197,7 +197,7 @@ public actor SearchEngine {
         }
         let pending = Data(initial.dropFirst(initFrame.consumed))
         if type == "F" {
-            await onFileConnection?(conn, pending)
+            await onFileConnection?(PeerLink(conn), pending)
             return
         }
         guard type == "P" else { conn.cancel(); return }

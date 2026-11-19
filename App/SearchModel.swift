@@ -7,7 +7,7 @@ import SoulseekProtocol
 @MainActor
 @Observable
 final class SearchModel {
-    struct ResultGroup: Identifiable, Equatable {
+    struct ResultGroup: Identifiable, Equatable, Sendable {
         let id: String
         let username: String
         let folder: String
@@ -25,11 +25,13 @@ final class SearchModel {
     private(set) var groups: [ResultGroup] = []
 
     private let engine: SearchEngine
+    private let transferEngine: TransferEngine?
     private var stateTask: Task<Void, Never>?
     private var recomputeTask: Task<Void, Never>?
 
-    init(engine: SearchEngine) {
+    init(engine: SearchEngine, transferEngine: TransferEngine? = nil) {
         self.engine = engine
+        self.transferEngine = transferEngine
         stateTask = Task { [weak self] in
             guard let stream = self?.engine.states else { return }
             for await state in stream {
@@ -63,21 +65,49 @@ final class SearchModel {
         Task { await engine.stop() }
     }
 
+    func download(_ file: FileEntry, from username: String) {
+        Task { await transferEngine?.download(username: username, filename: file.path, size: file.size) }
+    }
+
     private func scheduleRecompute() {
         recomputeTask?.cancel()
+        let replies = engineState.replies
+        let freeSlotsOnly = self.freeSlotsOnly
+        let losslessOnly = self.losslessOnly
+        let minBitrate = self.minBitrate
         recomputeTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
-            self?.recompute()
+            // Heavy grouping runs OFF the main actor — 200k+ files must not
+            // block UI rendering while replies stream in.
+            let groups = await Task.detached(priority: .userInitiated) {
+                Self.computeGroups(
+                    replies: replies,
+                    freeSlotsOnly: freeSlotsOnly,
+                    losslessOnly: losslessOnly,
+                    minBitrate: minBitrate
+                )
+            }.value
+            guard !Task.isCancelled else { return }
+            self?.groups = groups
         }
     }
 
-    private func recompute() {
+    /// UI cap: render at most this many files; the network keeps everything.
+    nonisolated static let maxRenderedFiles = 5000
+
+    nonisolated private static func computeGroups(
+        replies: [SearchReply],
+        freeSlotsOnly: Bool,
+        losslessOnly: Bool,
+        minBitrate: Int
+    ) -> [ResultGroup] {
         var result: [ResultGroup] = []
-        for reply in engineState.replies {
+        var totalFiles = 0
+        for reply in replies {
             if freeSlotsOnly && !reply.freeSlots { continue }
             var byFolder: [String: [FileEntry]] = [:]
-            for file in reply.files where passes(file) {
+            for file in reply.files where passes(file, losslessOnly: losslessOnly, minBitrate: minBitrate) {
                 byFolder[file.folder, default: []].append(file)
             }
             for (folder, files) in byFolder.sorted(by: { $0.key < $1.key }) {
@@ -89,12 +119,14 @@ final class SearchModel {
                     avgSpeed: reply.avgSpeed,
                     files: files
                 ))
+                totalFiles += files.count
+                if totalFiles >= maxRenderedFiles { return result }
             }
         }
-        groups = result
+        return result
     }
 
-    private func passes(_ f: FileEntry) -> Bool {
+    nonisolated private static func passes(_ f: FileEntry, losslessOnly: Bool, minBitrate: Int) -> Bool {
         let lossless = ["flac", "wav", "alac", "ape", "wv"].contains(f.ext)
         if losslessOnly && !lossless { return false }
         if minBitrate > 0 {

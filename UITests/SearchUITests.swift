@@ -49,5 +49,31 @@ final class SearchUITests: XCTestCase {
         add(attachment)
         XCTAssertTrue(appeared, "no search results rendered")
         XCTAssertTrue(app.staticTexts["searchStatus"].exists)
+
+        // Let the search finish so the results list is stable before tapping.
+        let done = NSPredicate(format: "label BEGINSWITH 'Done'")
+        let doneExpectation = expectation(for: done, evaluatedWith: app.staticTexts["searchStatus"])
+        let doneResult = XCTWaiter.wait(for: [doneExpectation], timeout: 40)
+        if doneResult != .completed {
+            let failShot = XCUIScreen.main.screenshot()
+            let failAtt = XCTAttachment(screenshot: failShot)
+            failAtt.name = "done-wait-FAILURE"
+            failAtt.lifetime = .keepAlways
+            add(failAtt)
+            print("HIERARCHY-START\n\(String(app.debugDescription.prefix(4000)))\nHIERARCHY-END")
+        }
+
+        // Enqueue a download from the first result; verify the Transfers tab.
+        app.buttons["downloadButton"].firstMatch.tap()
+        let transfersTab = app.tabBars.buttons["Transfers"]
+        XCTAssertTrue(transfersTab.waitForExistence(timeout: 5), "Transfers tab missing")
+        transfersTab.tap()
+        XCTAssertTrue(app.staticTexts["transferFilename"].firstMatch.waitForExistence(timeout: 10), "transfer did not appear")
+
+        let transfersShot = XCUIScreen.main.screenshot()
+        let transfersAttachment = XCTAttachment(screenshot: transfersShot)
+        transfersAttachment.name = "transfers-state"
+        transfersAttachment.lifetime = .keepAlways
+        add(transfersAttachment)
     }
 }

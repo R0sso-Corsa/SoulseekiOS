@@ -14,11 +14,13 @@
 		2EC6376A7E3ABF52B2E9F4B6 /* SearchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13134CEA7098BB2250077288 /* SearchUITests.swift */; };
 		32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */; };
 		4BEED639ADEB8E26647ACF28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FA896C59EBF67275ACDD076 /* Assets.xcassets */; };
+		9C9F574B6D6EEA597207BF9B /* TransfersModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAC8752410A23D728351862 /* TransfersModel.swift */; };
 		A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */; };
 		A99CA29523A7C22074DC4A1D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34AB7531761603E0550DCA9 /* GlassStyle.swift */; };
 		ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACC65140334C67989CF2407 /* LoginView.swift */; };
 		B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D01518FCEE615528776464F /* SearchView.swift */; };
 		BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469C71F2B052D3754B85DF9A /* AppModel.swift */; };
+		EBB968700882DF939A2E5557 /* TransfersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE2208A487298B8DE1E39A6 /* TransfersView.swift */; };
 		FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E50120037E89A83F6D9B65 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
@@ -40,7 +42,9 @@
 		469C71F2B052D3754B85DF9A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginUITests.swift; sourceTree = "<group>"; };
 		5D771E7F90F60B1F8D953E13 /* SearchModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchModel.swift; sourceTree = "<group>"; };
+		6CAC8752410A23D728351862 /* TransfersModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersModel.swift; sourceTree = "<group>"; };
 		7ACC65140334C67989CF2407 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		9FE2208A487298B8DE1E39A6 /* TransfersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersView.swift; sourceTree = "<group>"; };
 		A7E50120037E89A83F6D9B65 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AE47E1E44AAB78905BDF28F6 /* SoulseekiOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SoulseekiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B34AB7531761603E0550DCA9 /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
@@ -110,6 +114,8 @@
 				5D771E7F90F60B1F8D953E13 /* SearchModel.swift */,
 				1D01518FCEE615528776464F /* SearchView.swift */,
 				E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */,
+				6CAC8752410A23D728351862 /* TransfersModel.swift */,
+				9FE2208A487298B8DE1E39A6 /* TransfersView.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -220,6 +226,8 @@
 				13F8BB00A9BB3AEDD50CD7CE /* SearchModel.swift in Sources */,
 				B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */,
 				32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */,
+				9C9F574B6D6EEA597207BF9B /* TransfersModel.swift in Sources */,
+				EBB968700882DF939A2E5557 /* TransfersView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -371,7 +379,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -396,7 +406,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
