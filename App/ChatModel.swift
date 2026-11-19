@@ -8,6 +8,8 @@ import SoulseekProtocol
 final class ChatModel {
     private(set) var conversations: [ChatEngine.Conversation] = []
     private(set) var roomList: RoomList?
+    private(set) var roomError: String?
+    private(set) var invitationsEnabled = true
 
     private let engine: ChatEngine
     private var task: Task<Void, Never>?
@@ -18,6 +20,8 @@ final class ChatModel {
             guard let stream = self?.engine.updates else { return }
             for await convs in stream {
                 self?.conversations = convs.sorted { $0.lastActivity > $1.lastActivity }
+                self?.roomError = await engine.roomError
+                self?.invitationsEnabled = await engine.invitationsEnabled
             }
         }
     }
@@ -44,6 +48,40 @@ final class ChatModel {
 
     func setTicker(in room: String, message: String) {
         Task { await engine.setTicker(in: room, message: message) }
+    }
+
+    // MARK: - Private rooms
+
+    func invite(_ username: String, to room: String) {
+        Task { await engine.invite(username, to: room) }
+    }
+
+    func removeMember(_ username: String, from room: String) {
+        Task { await engine.removeMember(username, from: room) }
+    }
+
+    func makeOperator(_ username: String, in room: String) {
+        Task { await engine.makeOperator(username, in: room) }
+    }
+
+    func removeOperator(_ username: String, in room: String) {
+        Task { await engine.removeOperator(username, in: room) }
+    }
+
+    func leavePrivateRoom(_ name: String) {
+        Task { await engine.leavePrivateRoom(name) }
+    }
+
+    func cancelOwnership(of name: String) {
+        Task { await engine.cancelOwnership(of: name) }
+    }
+
+    func setInvitationsEnabled(_ enable: Bool) {
+        Task { await engine.setInvitationsEnabled(enable) }
+    }
+
+    func clearRoomError() {
+        roomError = nil
     }
 
     func share(_ card: MusicCard, to conversationID: String) {

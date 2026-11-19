@@ -230,6 +230,110 @@ final class ChatEngineTests: XCTestCase {
         XCTAssertEqual(try sr.string(), "jazz")
         XCTAssertEqual(try sr.string(), "my ticker")
     }
+
+    /// Full private-room suite: join reply with owner/operators, member and
+    /// operator lists, invite/remove echoes, grant/revoke pushes, 1003 error.
+    func testPrivateRoomSuite() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server)
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        // Create private room → JoinRoom type 1.
+        await chat.joinRoom("vault", private: true)
+        let join = try server.readFrame()
+        XCTAssertEqual(join.code, 14)
+        var jr = MessageReader(join.payload)
+        XCTAssertEqual(try jr.string(), "vault")
+        XCTAssertEqual(try jr.u32(), 1)
+        try server.send(Data(hexString: "050000007661756c740100000003000000626f62010000000200000001000000e80300000500000000000000640000000a000000010000000000000001000000020000005553060000007465737465720100000005000000616c696365").framePayloadAsCode(14))
+        let joined = await waitFor(chat) { convs in
+            convs.contains { $0.id == "room:vault" && $0.isPrivate }
+        }
+        XCTAssertTrue(joined, "private join not applied")
+        var conv = await chat.conversations.first { $0.id == "room:vault" }
+        XCTAssertEqual(conv?.owner, "tester")
+        XCTAssertEqual(conv?.operators, ["alice"])
+        XCTAssertEqual(conv?.privateMembers, ["bob"])
+
+        // RoomMembers(133) snapshot.
+        var members = MessageWriter()
+        members.string("vault"); members.u32(2); members.string("bob"); members.string("carol")
+        try server.send(members.frame(code: 133))
+        let gotMembers = await waitFor(chat) { $0.first { $0.id == "room:vault" }?.privateMembers == ["bob", "carol"] }
+        XCTAssertTrue(gotMembers, "member list not applied")
+
+        // Invite → 134 out, echo adds the member.
+        await chat.invite("dave", to: "vault")
+        let inv = try server.readFrame()
+        XCTAssertEqual(inv.code, 134)
+        var ir = MessageReader(inv.payload)
+        XCTAssertEqual(try ir.string(), "vault")
+        XCTAssertEqual(try ir.string(), "dave")
+        var invEcho = MessageWriter()
+        invEcho.string("vault"); invEcho.string("dave")
+        try server.send(invEcho.frame(code: 134))
+        let gotInvite = await waitFor(chat) { $0.first { $0.id == "room:vault" }?.privateMembers.contains("dave") == true }
+        XCTAssertTrue(gotInvite, "invite echo not applied")
+
+        // Make operator → 143 out, echo updates operators.
+        await chat.makeOperator("bob", in: "vault")
+        let op = try server.readFrame()
+        XCTAssertEqual(op.code, 143)
+        var opEcho = MessageWriter()
+        opEcho.string("vault"); opEcho.string("bob")
+        try server.send(opEcho.frame(code: 143))
+        let gotOp = await waitFor(chat) { $0.first { $0.id == "room:vault" }?.operators.contains("bob") == true }
+        XCTAssertTrue(gotOp, "operator echo not applied")
+
+        // RoomOperators(148) replaces the list.
+        var ops = MessageWriter()
+        ops.string("vault"); ops.u32(1); ops.string("carol")
+        try server.send(ops.frame(code: 148))
+        let gotOps = await waitFor(chat) { $0.first { $0.id == "room:vault" }?.operators == ["carol"] }
+        XCTAssertTrue(gotOps, "operator list not applied")
+
+        // Remove member → 135 out, echo removes.
+        await chat.removeMember("dave", from: "vault")
+        let rem = try server.readFrame()
+        XCTAssertEqual(rem.code, 135)
+        var remEcho = MessageWriter()
+        remEcho.string("vault"); remEcho.string("dave")
+        try server.send(remEcho.frame(code: 135))
+        let gotRem = await waitFor(chat) { $0.first { $0.id == "room:vault" }?.privateMembers.contains("dave") == false }
+        XCTAssertTrue(gotRem, "remove echo not applied")
+
+        // CantCreateRoom(1003) surfaces an error.
+        var cant = MessageWriter()
+        cant.string("taken")
+        try server.send(cant.frame(code: 1003))
+        var gotErr = false
+        let errDeadline = Date().addingTimeInterval(5)
+        while Date() < errDeadline {
+            if await chat.roomError != nil { gotErr = true; break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertTrue(gotErr, "1003 error not surfaced")
+
+        // MembershipGranted(139) → auto-join sends JoinRoom type 1.
+        var granted = MessageWriter()
+        granted.string("otherroom")
+        try server.send(granted.frame(code: 139))
+        let autoJoin = try server.readFrame()
+        XCTAssertEqual(autoJoin.code, 14)
+        var ajr = MessageReader(autoJoin.payload)
+        XCTAssertEqual(try ajr.string(), "otherroom")
+        XCTAssertEqual(try ajr.u32(), 1)
+
+        // MembershipRevoked(140) removes the conversation.
+        var revoked = MessageWriter()
+        revoked.string("vault")
+        try server.send(revoked.frame(code: 140))
+        let gotRevoked = await waitFor(chat) { !$0.contains { $0.id == "room:vault" } }
+        XCTAssertTrue(gotRevoked, "revocation did not remove the room")
+    }
 }
 
 private extension Data {

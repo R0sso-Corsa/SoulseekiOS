@@ -29,6 +29,18 @@ public actor ServerConnection {
         case roomTickers(RoomTickers)
         case roomTickerAdded(room: String, username: String, message: String)
         case roomTickerRemoved(room: String, username: String)
+        case roomMembers(room: String, members: [String])
+        case roomMemberAdded(room: String, username: String)
+        case roomMemberRemoved(room: String, username: String)
+        case roomMembershipGranted(room: String)
+        case roomMembershipRevoked(room: String)
+        case roomInvitationsEnabled(Bool)
+        case roomOperatorAdded(room: String, username: String)
+        case roomOperatorRemoved(room: String, username: String)
+        case roomOperatorshipGranted(room: String)
+        case roomOperatorshipRevoked(room: String)
+        case roomOperators(room: String, operators: [String])
+        case cantCreateRoom(room: String)
     }
 
     public enum ConnectionError: Error, LocalizedError {
@@ -387,6 +399,52 @@ public actor ServerConnection {
             if let room = try? r.string(), let username = try? r.string() {
                 broadcast(.roomTickerRemoved(room: room, username: username))
             }
+        case 133: // RoomMembers (private room)
+            if let m = try? RoomMembers(payload: frame.payload) {
+                broadcast(.roomMembers(room: m.room, members: m.members))
+            }
+        case 134: // AddRoomMember echo
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string(), let username = try? r.string() {
+                broadcast(.roomMemberAdded(room: room, username: username))
+            }
+        case 135: // RemoveRoomMember echo
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string(), let username = try? r.string() {
+                broadcast(.roomMemberRemoved(room: room, username: username))
+            }
+        case 139: // RoomMembershipGranted — we were invited
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string() { broadcast(.roomMembershipGranted(room: room)) }
+        case 140: // RoomMembershipRevoked — we were removed
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string() { broadcast(.roomMembershipRevoked(room: room)) }
+        case 141: // EnableRoomInvitations echo
+            var r = MessageReader(frame.payload)
+            if let enable = try? r.u8() { broadcast(.roomInvitationsEnabled(enable != 0)) }
+        case 143: // AddRoomOperator echo
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string(), let username = try? r.string() {
+                broadcast(.roomOperatorAdded(room: room, username: username))
+            }
+        case 144: // RemoveRoomOperator echo
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string(), let username = try? r.string() {
+                broadcast(.roomOperatorRemoved(room: room, username: username))
+            }
+        case 145: // RoomOperatorshipGranted
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string() { broadcast(.roomOperatorshipGranted(room: room)) }
+        case 146: // RoomOperatorshipRevoked
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string() { broadcast(.roomOperatorshipRevoked(room: room)) }
+        case 148: // RoomOperators
+            if let o = try? RoomOperators(payload: frame.payload) {
+                broadcast(.roomOperators(room: o.room, operators: o.operators))
+            }
+        case 1003: // CantCreateRoom
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string() { broadcast(.cantCreateRoom(room: room)) }
         case 18: // ConnectToPeer: indirect connection request; route by type
             if let request = try? ConnectToPeerRequest(payload: frame.payload) {
                 if request.type == "F" {

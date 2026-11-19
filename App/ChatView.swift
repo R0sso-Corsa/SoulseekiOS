@@ -12,6 +12,9 @@ struct ChatView: View {
     @State private var showNewRoom = false
     @State private var showRooms = false
     @State private var showBuddies = false
+    @State private var showManage = false
+    @State private var showNewPrivateRoom = false
+    @State private var privateRoomName = ""
     @State private var newPeer = ""
     @State private var newRoomName = ""
     @State private var navTarget: String?
@@ -65,6 +68,10 @@ struct ChatView: View {
                         Label("Create / join group", systemImage: "person.3")
                     }
                     .accessibilityIdentifier("newRoomOption")
+                    Button { showNewPrivateRoom = true } label: {
+                        Label("Create private group", systemImage: "lock")
+                    }
+                    .accessibilityIdentifier("newPrivateRoomOption")
                     Button { model.refreshRoomList(); showRooms = true } label: {
                         Label("Browse groups", systemImage: "list.bullet")
                     }
@@ -103,7 +110,31 @@ struct ChatView: View {
             }
             .accessibilityIdentifier("createRoomButton")
         } message: {
-            Text("A new name creates a new group. Anyone can join a public group; share music with the ♪ button.")
+            Text("A new name creates a new public group. For an invite-only group use + → Create private group. Share music with the ♪ button.")
+        }
+        .alert("Create a private group", isPresented: $showNewPrivateRoom) {
+            TextField("Group name (max 24 chars)", text: $privateRoomName)
+                .accessibilityIdentifier("privateRoomNameField")
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let n = privateRoomName.trimmingCharacters(in: .whitespaces)
+                if ChatEngine.isValidRoomName(n) {
+                    model.joinRoom(n, private: true)
+                    navTarget = "room:\(n)"
+                }
+                privateRoomName = ""
+            }
+            .accessibilityIdentifier("createPrivateRoomButton")
+        } message: {
+            Text("Invite-only: you own the group and invite members from its Manage screen. Invited friends join automatically.")
+        }
+        .alert("Group error", isPresented: Binding(
+            get: { model.roomError != nil },
+            set: { if !$0 { model.clearRoomError() } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.roomError ?? "")
         }
         .sheet(isPresented: $showRooms) {
             RoomBrowserSheet(model: model) { room in
@@ -144,9 +175,12 @@ struct ConversationView: View {
     @State private var showSharePicker = false
     @State private var showTickerAlert = false
     @State private var tickerText = ""
+    @State private var showManage = false
+    @State private var hadConv = false
 
     private var conv: ChatEngine.Conversation? { chatModel.conversation(id) }
     private var isRoom: Bool { id.hasPrefix("room:") }
+    private var isPrivateRoom: Bool { isRoom && conv?.isPrivate == true }
     private var name: String {
         conv?.name ?? String(id.dropFirst(isRoom ? 5 : 3))
     }
@@ -195,8 +229,25 @@ struct ConversationView: View {
         }
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: conv?.id) { _, newID in
+            // Pop when the room disappears (left, disbanded, membership revoked)
+            // — but not before the initial join reply arrives.
+            if newID != nil {
+                hadConv = true
+            } else if hadConv {
+                dismiss()
+            }
+        }
         .toolbar {
             if isRoom {
+                if isPrivateRoom {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Manage") {
+                            showManage = true
+                        }
+                        .accessibilityIdentifier("manageRoomButton")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Ticker") {
                         tickerText = conv?.tickers[appModel.username] ?? ""
@@ -214,12 +265,19 @@ struct ConversationView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Leave") {
-                        chatModel.leaveRoom(name)
+                        if isPrivateRoom {
+                            chatModel.leavePrivateRoom(name)
+                        } else {
+                            chatModel.leaveRoom(name)
+                        }
                         dismiss()
                     }
                     .accessibilityIdentifier("leaveRoomButton")
                 }
             }
+        }
+        .sheet(isPresented: $showManage) {
+            PrivateRoomSheet(chatModel: chatModel, appModel: appModel, room: name)
         }
         .sheet(isPresented: $showSharePicker) {
             SharePickerSheet(groups: appModel.searchModel.groups) { file, username in
@@ -411,17 +469,33 @@ struct RoomBrowserSheet: View {
     let model: ChatModel
     let onJoin: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private func matches(_ name: String) -> Bool {
+        searchText.isEmpty || name.localizedCaseInsensitiveContains(searchText)
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                let myRooms = model.conversations.filter { $0.kind == .room }
+                Section {
+                    TextField("Search groups…", text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("roomSearchField")
+                }
+                let myRooms = model.conversations.filter { $0.kind == .room && matches($0.name) }
                 if !myRooms.isEmpty {
                     Section("Your groups") {
                         ForEach(myRooms) { conv in
                             Button { onJoin(conv.name) } label: {
                                 HStack {
                                     Text(conv.name)
+                                    if conv.isPrivate {
+                                        Image(systemName: "lock.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
                                     Spacer()
                                     Text("\(conv.members.count)")
                                         .foregroundStyle(.secondary)
@@ -432,21 +506,12 @@ struct RoomBrowserSheet: View {
                     }
                 }
                 if let list = model.roomList {
-                    Section("Public groups") {
-                        ForEach(list.publicRooms.sorted { $0.userCount > $1.userCount }, id: \.name) { room in
-                            Button { onJoin(room.name) } label: {
-                                HStack {
-                                    Text(room.name)
-                                    Spacer()
-                                    Text("\(room.userCount)")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    if !list.ownedPrivateRooms.isEmpty {
-                        Section("Your private groups") {
-                            ForEach(list.ownedPrivateRooms, id: \.name) { room in
+                    let publicRooms = list.publicRooms
+                        .filter { matches($0.name) }
+                        .sorted { $0.userCount > $1.userCount }
+                    if !publicRooms.isEmpty {
+                        Section("Public groups") {
+                            ForEach(publicRooms, id: \.name) { room in
                                 Button { onJoin(room.name) } label: {
                                     HStack {
                                         Text(room.name)
@@ -455,6 +520,45 @@ struct RoomBrowserSheet: View {
                                             .foregroundStyle(.secondary)
                                     }
                                 }
+                                .accessibilityIdentifier("roomRow")
+                            }
+                        }
+                    }
+                    let myPrivate = list.ownedPrivateRooms.filter { matches($0.name) }
+                    if !myPrivate.isEmpty {
+                        Section("Your private groups") {
+                            ForEach(myPrivate, id: \.name) { room in
+                                Button { onJoin(room.name) } label: {
+                                    HStack {
+                                        Image(systemName: "lock.fill").font(.caption2)
+                                        Text(room.name)
+                                        Spacer()
+                                        Text("\(room.userCount)").foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let invited = list.privateRooms.filter { matches($0.name) }
+                    if !invited.isEmpty {
+                        Section("Private groups you're in") {
+                            ForEach(invited, id: \.name) { room in
+                                Button { onJoin(room.name) } label: {
+                                    HStack {
+                                        Image(systemName: "lock.fill").font(.caption2)
+                                        Text(room.name)
+                                        Spacer()
+                                        Text("\(room.userCount)").foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let operated = list.operatedRooms.filter { matches($0) }
+                    if !operated.isEmpty {
+                        Section("Groups you operate") {
+                            ForEach(operated, id: \.self) { room in
+                                Button { onJoin(room) } label: { Text(room) }
                             }
                         }
                     }
@@ -462,7 +566,7 @@ struct RoomBrowserSheet: View {
                     ProgressView("Loading groups…")
                 }
                 Section {
-                    Text("The server only lists groups with 5+ members. New groups are invisible here until people join — invite friends by sending them the name (+ → New message).")
+                    Text("The server only lists groups with 5+ members. New groups are invisible here until people join — create a private group (+ → Create/join group → Private) and invite friends from its Manage screen.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

@@ -311,6 +311,8 @@ final class AppModel {
             Task { await searchEngine.startListening() }
             Task { await announceShares() }
             Task { await buddyEngine.refreshAll() }
+            // Accept private-room invitations (server default is off).
+            Task { await chatEngine.setInvitationsEnabled(true) }
         case .failed(let reason):
             phase = .failed(reason)
             Task { await searchEngine.stopListening() }

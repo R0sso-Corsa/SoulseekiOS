@@ -31,6 +31,13 @@ struct SettingsSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                Section("Chat") {
+                    Toggle("Accept group invitations", isOn: Binding(
+                        get: { appModel.chatModel.invitationsEnabled },
+                        set: { appModel.chatModel.setInvitationsEnabled($0) }
+                    ))
+                    .accessibilityIdentifier("invitationsToggle")
+                }
                 Section("Storage") {
                     HStack {
                         Text("Downloads folder")

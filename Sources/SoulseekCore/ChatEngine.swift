@@ -40,11 +40,18 @@ public actor ChatEngine {
         public var members: [RoomMember] = []
         public var owner: String?
         public var tickers: [String: String] = [:]
+        public var isPrivate = false
+        public var privateMembers: [String] = []
+        public var operators: [String] = []
         public var lastActivity = Date()
     }
 
     public private(set) var conversations: [Conversation] = []
     public private(set) var roomList: RoomList?
+    /// Last room-creation error (CantCreateRoom 1003), for the create alert.
+    public private(set) var roomError: String?
+    /// Whether we accept private-room invitations (EnableRoomInvitations 141).
+    public private(set) var invitationsEnabled = true
     public nonisolated let updates: AsyncStream<[Conversation]>
     private let updatesContinuation: AsyncStream<[Conversation]>.Continuation
 
@@ -82,7 +89,71 @@ public actor ChatEngine {
     /// type: public by default; private rooms are invite-only groups.
     public func joinRoom(_ name: String, private isPrivate: Bool = false) async {
         guard Self.isValidRoomName(name) else { return }
+        roomError = nil
         try? await server.send(frame: ServerMessages.joinRoom(room: name, type: isPrivate ? 1 : 0))
+    }
+
+    // MARK: - Private rooms
+
+    /// Invite a user (AddRoomMember 134; owner/operator only).
+    /// The server does not echo 134 to the sender, so apply locally too.
+    public func invite(_ username: String, to room: String) async {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        try? await server.send(frame: ServerMessages.addRoomMember(room: room, username: name))
+        if var conv = conversation("room:\(room)"), !conv.privateMembers.contains(name) {
+            conv.privateMembers.append(name)
+            upsert(conv)
+            system("room:\(room)", kind: .room, name: room, "\(name) was invited")
+        }
+    }
+
+    /// Remove a member (RemoveRoomMember 135).
+    public func removeMember(_ username: String, from room: String) async {
+        try? await server.send(frame: ServerMessages.removeRoomMember(room: room, username: username))
+        if var conv = conversation("room:\(room)") {
+            conv.privateMembers.removeAll { $0 == username }
+            conv.operators.removeAll { $0 == username }
+            upsert(conv)
+            publish()
+        }
+    }
+
+    /// Grant operator abilities (AddRoomOperator 143; owner only).
+    public func makeOperator(_ username: String, in room: String) async {
+        try? await server.send(frame: ServerMessages.addRoomOperator(room: room, username: username))
+        if var conv = conversation("room:\(room)"), !conv.operators.contains(username) {
+            conv.operators.append(username)
+            upsert(conv)
+            publish()
+        }
+    }
+
+    /// Revoke operator abilities (RemoveRoomOperator 144; owner only).
+    public func removeOperator(_ username: String, in room: String) async {
+        try? await server.send(frame: ServerMessages.removeRoomOperator(room: room, username: username))
+        if var conv = conversation("room:\(room)") {
+            conv.operators.removeAll { $0 == username }
+            upsert(conv)
+            publish()
+        }
+    }
+
+    /// Leave a private room for good (CancelRoomMembership 136).
+    public func leavePrivateRoom(_ name: String) async {
+        try? await server.send(frame: ServerMessages.cancelRoomMembership(room: name))
+        conversations.removeAll { $0.id == "room:\(name)" }
+        publish()
+    }
+
+    /// Stop owning a private room (CancelRoomOwnership 137).
+    public func cancelOwnership(of name: String) async {
+        try? await server.send(frame: ServerMessages.cancelRoomOwnership(room: name))
+    }
+
+    /// Accept or refuse private-room invitations (EnableRoomInvitations 141).
+    public func setInvitationsEnabled(_ enable: Bool) async {
+        try? await server.send(frame: ServerMessages.enableRoomInvitations(enable))
     }
 
     public func leaveRoom(_ name: String) async {
@@ -160,6 +231,9 @@ public actor ChatEngine {
                 var conv = conversation("room:\(rj.room)") ?? Conversation(id: "room:\(rj.room)", kind: .room, name: rj.room)
                 conv.members = rj.members
                 conv.owner = rj.owner
+                conv.isPrivate = rj.owner != nil
+                conv.operators = rj.operators
+                conv.privateMembers = rj.members.map(\.username)
                 upsert(conv)
                 system("room:\(rj.room)", kind: .room, name: rj.room, "Joined \(rj.room)")
             case .roomLeft(let room):
@@ -199,6 +273,72 @@ public actor ChatEngine {
                     upsert(conv)
                     publish()
                 }
+            case .roomMembers(let room, let members):
+                if var conv = conversation("room:\(room)") {
+                    conv.privateMembers = members
+                    upsert(conv)
+                    publish()
+                }
+            case .roomMemberAdded(let room, let username):
+                if var conv = conversation("room:\(room)") {
+                    if !conv.privateMembers.contains(username) {
+                        conv.privateMembers.append(username)
+                    }
+                    upsert(conv)
+                    system("room:\(room)", kind: .room, name: room, "\(username) was invited")
+                }
+            case .roomMemberRemoved(let room, let username):
+                if var conv = conversation("room:\(room)") {
+                    conv.privateMembers.removeAll { $0 == username }
+                    conv.operators.removeAll { $0 == username }
+                    upsert(conv)
+                    system("room:\(room)", kind: .room, name: room, "\(username) was removed")
+                }
+            case .roomMembershipGranted(let room):
+                // Invited to a private room — join it automatically.
+                system("room:\(room)", kind: .room, name: room, "You were invited to \(room)")
+                await joinRoom(room, private: true)
+            case .roomMembershipRevoked(let room):
+                conversations.removeAll { $0.id == "room:\(room)" }
+                publish()
+            case .roomInvitationsEnabled(let enable):
+                invitationsEnabled = enable
+                publish()
+            case .roomOperatorAdded(let room, let username):
+                if var conv = conversation("room:\(room)") {
+                    if !conv.operators.contains(username) { conv.operators.append(username) }
+                    upsert(conv)
+                    system("room:\(room)", kind: .room, name: room, "\(username) is now an operator")
+                }
+            case .roomOperatorRemoved(let room, let username):
+                if var conv = conversation("room:\(room)") {
+                    conv.operators.removeAll { $0 == username }
+                    upsert(conv)
+                    system("room:\(room)", kind: .room, name: room, "\(username) is no longer an operator")
+                }
+            case .roomOperatorshipGranted(let room):
+                if var conv = conversation("room:\(room)") {
+                    let me = await server.username
+                    if !conv.operators.contains(me) { conv.operators.append(me) }
+                    upsert(conv)
+                    system("room:\(room)", kind: .room, name: room, "You are now an operator")
+                }
+            case .roomOperatorshipRevoked(let room):
+                if var conv = conversation("room:\(room)") {
+                    let me = await server.username
+                    conv.operators.removeAll { $0 == me }
+                    upsert(conv)
+                    system("room:\(room)", kind: .room, name: room, "Your operator abilities were removed")
+                }
+            case .roomOperators(let room, let operators):
+                if var conv = conversation("room:\(room)") {
+                    conv.operators = operators
+                    upsert(conv)
+                    publish()
+                }
+            case .cantCreateRoom(let room):
+                roomError = "Couldn't create \"\(room)\" — the name is used by a private group."
+                publish()
             default:
                 break
             }
