@@ -15,4 +15,23 @@ extension XCUIApplication {
             Thread.sleep(forTimeInterval: 0.5)
         }
     }
+
+    /// Tap a chip/menu button, retrying until the expected menu item appears
+    /// (the same tap quirk affects menu labels).
+    func openMenu(_ chipLabel: String, item: String) {
+        let chip = buttons[chipLabel]
+        for _ in 0..<3 {
+            guard chip.waitForExistence(timeout: 5) else { return }
+            chip.tap()
+            if buttons[item].waitForExistence(timeout: 3) { return }
+        }
+    }
+
+    /// Wait out a transient disconnect (login overlay), then return to a tab.
+    func waitForReconnect(tab: String) {
+        if textFields["usernameField"].exists {
+            _ = textFields["usernameField"].waitForNonExistence(timeout: 40)
+            tapTab(tab)
+        }
+    }
 }

@@ -41,10 +41,24 @@ final class SharingUITests: XCTestCase {
         sharingButton.tap()
 
         let rootRow = app.staticTexts["shareRootRow"].firstMatch
-        XCTAssertTrue(rootRow.waitForExistence(timeout: 15), "seeded share root missing")
+        if !rootRow.waitForExistence(timeout: 15) {
+            app.waitForReconnect(tab: "Transfers")
+            sharingButton.tap()
+            XCTAssertTrue(rootRow.waitForExistence(timeout: 15), "seeded share root missing")
+        }
         XCTAssertEqual(rootRow.label, "SeedShare")
         let count = app.staticTexts["shareFileCount"]
-        XCTAssertTrue(count.waitForExistence(timeout: 10))
+        if !count.waitForExistence(timeout: 5) {
+            // Stats section can sit below the fold; List rows only enter the
+            // accessibility hierarchy once scrolled into view.
+            app.swipeUp()
+            if !count.waitForExistence(timeout: 5) {
+                app.waitForReconnect(tab: "Transfers")
+                sharingButton.tap()
+                app.swipeUp()
+            }
+            XCTAssertTrue(count.waitForExistence(timeout: 10), "share file count missing")
+        }
         XCTAssertEqual(count.label, "1")
 
         let shot = XCUIScreen.main.screenshot()

@@ -6,6 +6,8 @@ struct SearchView: View {
     var appModel: AppModel? = nil
     @State private var selectedUser: String?
     @State private var showWishlist = false
+    @State private var showCustomBitrate = false
+    @State private var customBitrateText = ""
 
     var body: some View {
         ZStack {
@@ -47,12 +49,27 @@ struct SearchView: View {
                                 Text("256+").tag(256)
                                 Text("320").tag(320)
                             }
+                            Divider()
+                            Button("Custom…") {
+                                customBitrateText = model.minBitrate > 0 ? String(model.minBitrate) : ""
+                                showCustomBitrate = true
+                            }
                         } label: {
                             GlassChipLabel(
                                 title: model.minBitrate == 0 ? "Bitrate" : "\(model.minBitrate)+",
                                 systemImage: "waveform",
                                 selected: model.minBitrate > 0
                             )
+                        }
+                        .alert("Custom min bitrate", isPresented: $showCustomBitrate) {
+                            TextField("kbps", text: $customBitrateText)
+                                .keyboardType(.numberPad)
+                            Button("Apply") {
+                                model.minBitrate = max(0, Int(customBitrateText) ?? 0)
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Minimum bitrate in kbps — any value, e.g. 500 or 1000.")
                         }
                         Button { model.freeSlotsOnly.toggle() } label: {
                             GlassChipLabel(title: "Slots", systemImage: "checkmark.circle", selected: model.freeSlotsOnly)
@@ -62,6 +79,20 @@ struct SearchView: View {
                             GlassChipLabel(title: "Lossless", systemImage: "hifispeaker", selected: model.losslessOnly)
                         }
                         .buttonStyle(.plain)
+                        Menu {
+                            Picker("Min bit depth", selection: $model.minBitDepth) {
+                                Text("Any depth").tag(0)
+                                Text("16-bit+").tag(16)
+                                Text("24-bit+").tag(24)
+                                Text("32-bit+").tag(32)
+                            }
+                        } label: {
+                            GlassChipLabel(
+                                title: model.minBitDepth == 0 ? "Depth" : "\(model.minBitDepth)+",
+                                systemImage: "slider.vertical.3",
+                                selected: model.minBitDepth > 0
+                            )
+                        }
                         Spacer()
                     }
                 }
@@ -184,6 +215,10 @@ struct FileRow: View {
                     Text(file.ext.uppercased())
                     if let bitrate = file.bitrate, bitrate > 0 { Text("\(bitrate) kbps") }
                     if let sampleRate = file.sampleRate { Text("\(sampleRate / 1000) kHz") }
+                    if let bitness = file.bitness, bitness > 0 {
+                        Text("\(bitness)-bit")
+                            .accessibilityIdentifier("fileBitDepth")
+                    }
                     if let duration = file.duration { Text(durationText(duration)) }
                     Text(sizeText(file.size))
                 }

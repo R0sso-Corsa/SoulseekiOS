@@ -18,6 +18,7 @@ final class SearchModel {
 
     var queryText = ""
     var minBitrate = 0 { didSet { scheduleRecompute() } }
+    var minBitDepth = 0 { didSet { scheduleRecompute() } }
     var freeSlotsOnly = false { didSet { scheduleRecompute() } }
     var losslessOnly = false { didSet { scheduleRecompute() } }
 
@@ -80,6 +81,7 @@ final class SearchModel {
         let freeSlotsOnly = self.freeSlotsOnly
         let losslessOnly = self.losslessOnly
         let minBitrate = self.minBitrate
+        let minBitDepth = self.minBitDepth
         recomputeTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
@@ -90,7 +92,8 @@ final class SearchModel {
                     replies: replies,
                     freeSlotsOnly: freeSlotsOnly,
                     losslessOnly: losslessOnly,
-                    minBitrate: minBitrate
+                    minBitrate: minBitrate,
+                    minBitDepth: minBitDepth
                 )
             }.value
             guard !Task.isCancelled else { return }
@@ -105,14 +108,15 @@ final class SearchModel {
         replies: [SearchReply],
         freeSlotsOnly: Bool,
         losslessOnly: Bool,
-        minBitrate: Int
+        minBitrate: Int,
+        minBitDepth: Int
     ) -> [ResultGroup] {
         var result: [ResultGroup] = []
         var totalFiles = 0
         for reply in replies {
             if freeSlotsOnly && !reply.freeSlots { continue }
             var byFolder: [String: [FileEntry]] = [:]
-            for file in reply.files where passes(file, losslessOnly: losslessOnly, minBitrate: minBitrate) {
+            for file in reply.files where passes(file, losslessOnly: losslessOnly, minBitrate: minBitrate, minBitDepth: minBitDepth) {
                 byFolder[file.folder, default: []].append(file)
             }
             for (folder, files) in byFolder.sorted(by: { $0.key < $1.key }) {
@@ -131,7 +135,7 @@ final class SearchModel {
         return result
     }
 
-    nonisolated private static func passes(_ f: FileEntry, losslessOnly: Bool, minBitrate: Int) -> Bool {
+    nonisolated private static func passes(_ f: FileEntry, losslessOnly: Bool, minBitrate: Int, minBitDepth: Int) -> Bool {
         let lossless = ["flac", "wav", "alac", "ape", "wv"].contains(f.ext)
         if losslessOnly && !lossless { return false }
         if minBitrate > 0 {
@@ -140,6 +144,10 @@ final class SearchModel {
             } else if !lossless {
                 return false // unknown bitrate on a lossy file
             }
+        }
+        if minBitDepth > 0 {
+            // Bit depth is only meaningful when reported; unknowns are excluded.
+            guard let bitness = f.bitness, bitness >= UInt32(minBitDepth) else { return false }
         }
         return true
     }
