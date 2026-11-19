@@ -33,6 +33,8 @@ final class AppModel {
     let chatModel: ChatModel
     let wishlistEngine: WishlistEngine
     let wishlistModel: WishlistModel
+    let buddyEngine: BuddyEngine
+    let buddyModel: BuddyModel
     let shareIndex: ShareIndex
     let uploadEngine: UploadEngine
     let uploadsModel: UploadsModel
@@ -81,6 +83,9 @@ final class AppModel {
         wishlistEngine = WishlistEngine(server: connection, searchEngine: searchEngine,
                                         storeURL: support.appendingPathComponent("wishlist.json"))
         wishlistModel = WishlistModel(engine: wishlistEngine)
+        let buddies = BuddyEngine(server: connection, storeURL: support.appendingPathComponent("buddies.json"))
+        buddyEngine = buddies
+        buddyModel = BuddyModel(engine: buddies)
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }
@@ -244,6 +249,7 @@ final class AppModel {
             phase = .connected(greeting: greeting, publicIP: publicIP, privileged: privileged)
             Task { await searchEngine.startListening() }
             Task { await announceShares() }
+            Task { await buddyEngine.refreshAll() }
         case .failed(let reason):
             phase = .failed(reason)
             Task { await searchEngine.stopListening() }

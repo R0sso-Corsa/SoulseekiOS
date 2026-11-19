@@ -11,6 +11,7 @@ struct ChatView: View {
     @State private var showNewPM = false
     @State private var showNewRoom = false
     @State private var showRooms = false
+    @State private var showBuddies = false
     @State private var newPeer = ""
     @State private var newRoomName = ""
     @State private var navTarget: String?
@@ -67,6 +68,11 @@ struct ChatView: View {
                     Button { model.refreshRoomList(); showRooms = true } label: {
                         Label("Browse groups", systemImage: "list.bullet")
                     }
+                    .accessibilityIdentifier("browseRoomsOption")
+                    Button { showBuddies = true } label: {
+                        Label("Buddies", systemImage: "person.2")
+                    }
+                    .accessibilityIdentifier("buddiesOption")
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -105,6 +111,9 @@ struct ChatView: View {
                 showRooms = false
                 navTarget = "room:\(room)"
             }
+        }
+        .sheet(isPresented: $showBuddies) {
+            BuddiesSheet(appModel: appModel)
         }
         .navigationDestination(isPresented: Binding(
             get: { navTarget != nil },

@@ -25,15 +25,17 @@ public actor ServerConnection {
         case userLeftRoom(UserLeftRoom)
         case roomList(RoomList)
         case wishlistInterval(UInt64)
+        case userStatus(UserStatus)
     }
 
     public enum ConnectionError: Error, LocalizedError {
-        case notConnected, addressTimeout
+        case notConnected, addressTimeout, watchTimeout
 
         public var errorDescription: String? {
             switch self {
             case .notConnected: return "Not connected to the server"
             case .addressTimeout: return "Couldn't reach the user (address lookup timed out)"
+            case .watchTimeout: return "Couldn't watch the user (server timed out)"
             }
         }
     }
@@ -58,6 +60,7 @@ public actor ServerConnection {
     private var addressRequests: [String: [CheckedContinuation<PeerAddressReply, Error>]] = [:]
     private var statsRequests: [String: [CheckedContinuation<UserStats, Error>]] = [:]
     private var statusRequests: [String: [CheckedContinuation<UserStatus, Error>]] = [:]
+    private var watchRequests: [String: [CheckedContinuation<WatchUserReply, Error>]] = [:]
 
     public init() {
         var continuation: AsyncStream<State>.Continuation?
@@ -224,6 +227,25 @@ public actor ServerConnection {
         }
     }
 
+    /// WatchUser(5): initial status + stats; later changes push as
+    /// GetUserStatus(7) → .userStatus events. 15s timeout.
+    public func watchUser(_ username: String) async throws -> WatchUserReply {
+        try await send(ServerMessages.watchUser(username))
+        return try await withCheckedThrowingContinuation { cont in
+            watchRequests[username, default: []].append(cont)
+            Task {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                await self.timeoutWatchRequest(username)
+            }
+        }
+    }
+
+    private func timeoutWatchRequest(_ username: String) async {
+        if let conts = watchRequests.removeValue(forKey: username) {
+            for cont in conts { cont.resume(throwing: ConnectionError.watchTimeout) }
+        }
+    }
+
     // MARK: - Internals
 
     private func setState(_ newState: State) {
@@ -336,9 +358,16 @@ public actor ServerConnection {
                let conts = statsRequests.removeValue(forKey: reply.username) {
                 for cont in conts { cont.resume(returning: reply) }
             }
-        case 7: // GetUserStatus reply
-            if let reply = try? UserStatus(payload: frame.payload),
-               let conts = statusRequests.removeValue(forKey: reply.username) {
+        case 7: // GetUserStatus reply / push
+            if let reply = try? UserStatus(payload: frame.payload) {
+                if let conts = statusRequests.removeValue(forKey: reply.username) {
+                    for cont in conts { cont.resume(returning: reply) }
+                }
+                broadcast(.userStatus(reply))
+            }
+        case 5: // WatchUser reply
+            if let reply = try? WatchUserReply(payload: frame.payload),
+               let conts = watchRequests.removeValue(forKey: reply.username) {
                 for cont in conts { cont.resume(returning: reply) }
             }
         case 18: // ConnectToPeer: indirect connection request; route by type

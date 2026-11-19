@@ -20,6 +20,12 @@ struct UserView: View {
                 GlassBackground()
                 List {
                     Section("User") {
+                        Button {
+                            appModel.buddyModel.add(username)
+                        } label: {
+                            Label("Add to buddies", systemImage: "person.badge.plus")
+                        }
+                        .accessibilityIdentifier("addBuddyFromUserButton")
                         HStack {
                             Text("Status")
                             Spacer()
