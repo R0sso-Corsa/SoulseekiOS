@@ -12,6 +12,10 @@ struct ContentView: View {
                 }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 NavigationStack {
+                    ChatView(model: model.chatModel, appModel: model)
+                }
+                .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }
+                NavigationStack {
                     ConnectedView(
                         greeting: greeting,
                         publicIP: publicIP,

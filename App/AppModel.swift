@@ -26,6 +26,8 @@ final class AppModel {
     let transferEngine: TransferEngine
     let transfersModel: TransfersModel
     let browseEngine: BrowseEngine
+    let chatEngine: ChatEngine
+    let chatModel: ChatModel
     private let connection = ServerConnection()
     private let keychain = KeychainStore()
     private var stateTask: Task<Void, Never>?
@@ -44,6 +46,8 @@ final class AppModel {
         }
         searchModel = SearchModel(engine: searchEngine, transferEngine: transfers)
         transfersModel = TransfersModel(engine: transfers)
+        chatEngine = ChatEngine(server: connection)
+        chatModel = ChatModel(engine: chatEngine)
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }

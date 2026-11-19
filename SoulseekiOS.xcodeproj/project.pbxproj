@@ -10,18 +10,21 @@
 		07189AB8FABD5748B2078511 /* SoulseekProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 2F834DD811A762594B18F0BD /* SoulseekProtocol */; };
 		0CFBB8B6911CA93CC8914733 /* SoulseekCore in Frameworks */ = {isa = PBXBuildFile; productRef = 77A5C986D02FC47ACBD9083B /* SoulseekCore */; };
 		13F8BB00A9BB3AEDD50CD7CE /* SearchModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D771E7F90F60B1F8D953E13 /* SearchModel.swift */; };
+		143C8837127414BF1AAC57F7 /* ChatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */; };
 		2D3FDE9A541C95D9675FCF37 /* ConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B05165D9BA257D45076858 /* ConnectedView.swift */; };
 		2EC6376A7E3ABF52B2E9F4B6 /* SearchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13134CEA7098BB2250077288 /* SearchUITests.swift */; };
 		32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */; };
 		32EF6437B534850DF69213E1 /* BrowseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */; };
 		4BEED639ADEB8E26647ACF28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FA896C59EBF67275ACDD076 /* Assets.xcassets */; };
 		816CCAC6E593AFC2F8472CCD /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */; };
+		8B7FC377423FEDF8938FC36C /* ChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE56415029EAA10FDE2624FA /* ChatModel.swift */; };
 		9C9F574B6D6EEA597207BF9B /* TransfersModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAC8752410A23D728351862 /* TransfersModel.swift */; };
 		A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */; };
 		A99CA29523A7C22074DC4A1D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34AB7531761603E0550DCA9 /* GlassStyle.swift */; };
 		ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACC65140334C67989CF2407 /* LoginView.swift */; };
 		B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D01518FCEE615528776464F /* SearchView.swift */; };
 		BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469C71F2B052D3754B85DF9A /* AppModel.swift */; };
+		E25A0FDBED7EBC47A73A0900 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCE411F2720855E77992687 /* ChatView.swift */; };
 		EBB968700882DF939A2E5557 /* TransfersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE2208A487298B8DE1E39A6 /* TransfersView.swift */; };
 		FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E50120037E89A83F6D9B65 /* ContentView.swift */; };
 /* End PBXBuildFile section */
@@ -51,10 +54,13 @@
 		AE47E1E44AAB78905BDF28F6 /* SoulseekiOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SoulseekiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseUITests.swift; sourceTree = "<group>"; };
 		B34AB7531761603E0550DCA9 /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
+		BBCE411F2720855E77992687 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
 		DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SoulseekiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulseekiOSApp.swift; sourceTree = "<group>"; };
 		F41AA9BE35D4320C5763AE59 /* SoulseekiOS */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SoulseekiOS; path = .; sourceTree = SOURCE_ROOT; };
+		F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatUITests.swift; sourceTree = "<group>"; };
+		FE56415029EAA10FDE2624FA /* ChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +80,7 @@
 			isa = PBXGroup;
 			children = (
 				B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */,
+				F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */,
 				517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */,
 				13134CEA7098BB2250077288 /* SearchUITests.swift */,
 			);
@@ -112,6 +119,8 @@
 			children = (
 				469C71F2B052D3754B85DF9A /* AppModel.swift */,
 				3FA896C59EBF67275ACDD076 /* Assets.xcassets */,
+				FE56415029EAA10FDE2624FA /* ChatModel.swift */,
+				BBCE411F2720855E77992687 /* ChatView.swift */,
 				10B05165D9BA257D45076858 /* ConnectedView.swift */,
 				A7E50120037E89A83F6D9B65 /* ContentView.swift */,
 				B34AB7531761603E0550DCA9 /* GlassStyle.swift */,
@@ -225,6 +234,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */,
+				8B7FC377423FEDF8938FC36C /* ChatModel.swift in Sources */,
+				E25A0FDBED7EBC47A73A0900 /* ChatView.swift in Sources */,
 				2D3FDE9A541C95D9675FCF37 /* ConnectedView.swift in Sources */,
 				FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */,
 				A99CA29523A7C22074DC4A1D /* GlassStyle.swift in Sources */,
@@ -243,6 +254,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				32EF6437B534850DF69213E1 /* BrowseUITests.swift in Sources */,
+				143C8837127414BF1AAC57F7 /* ChatUITests.swift in Sources */,
 				A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */,
 				2EC6376A7E3ABF52B2E9F4B6 /* SearchUITests.swift in Sources */,
 			);

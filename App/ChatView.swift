@@ -1,0 +1,404 @@
+import SwiftUI
+import SoulseekCore
+import SoulseekProtocol
+
+/// Chat tab: private messages + group chats (rooms). Groups are created by
+/// joining a new name; music is shared as tappable download cards (AD-12).
+struct ChatView: View {
+    @Bindable var model: ChatModel
+    let appModel: AppModel
+
+    @State private var showNewPM = false
+    @State private var showNewRoom = false
+    @State private var showRooms = false
+    @State private var newPeer = ""
+    @State private var newRoomName = ""
+    @State private var navTarget: String?
+
+    var body: some View {
+        ZStack {
+            GlassBackground()
+            List {
+                ForEach(model.conversations) { conv in
+                    NavigationLink {
+                        ConversationView(chatModel: model, appModel: appModel, id: conv.id)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: conv.kind == .room ? "person.3.fill" : "person.fill")
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(conv.name)
+                                    .font(.subheadline)
+                                Text(preview(conv))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("conversationRow")
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, 64, for: .scrollContent)
+            .overlay {
+                if model.conversations.isEmpty {
+                    ContentUnavailableView(
+                        "No chats",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: Text("Start a private message or create a group with +.")
+                    )
+                }
+            }
+        }
+        .navigationTitle("Chat")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showNewPM = true } label: {
+                        Label("New message", systemImage: "person")
+                    }
+                    .accessibilityIdentifier("newPMOption")
+                    Button { showNewRoom = true } label: {
+                        Label("Create / join group", systemImage: "person.3")
+                    }
+                    .accessibilityIdentifier("newRoomOption")
+                    Button { model.refreshRoomList(); showRooms = true } label: {
+                        Label("Browse groups", systemImage: "list.bullet")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityIdentifier("newChatButton")
+            }
+        }
+        .alert("New message", isPresented: $showNewPM) {
+            TextField("Username", text: $newPeer)
+                .accessibilityIdentifier("peerField")
+            Button("Cancel", role: .cancel) {}
+            Button("Start") {
+                let u = newPeer.trimmingCharacters(in: .whitespaces)
+                if !u.isEmpty { navTarget = "pm:\(u)" }
+                newPeer = ""
+            }
+        }
+        .alert("Create or join a group", isPresented: $showNewRoom) {
+            TextField("Group name (max 24 chars)", text: $newRoomName)
+                .accessibilityIdentifier("roomNameField")
+            Button("Cancel", role: .cancel) {}
+            Button("Join / Create") {
+                let n = newRoomName.trimmingCharacters(in: .whitespaces)
+                if ChatEngine.isValidRoomName(n) {
+                    model.joinRoom(n)
+                    navTarget = "room:\(n)"
+                }
+                newRoomName = ""
+            }
+            .accessibilityIdentifier("createRoomButton")
+        } message: {
+            Text("A new name creates a new group. Anyone can join a public group; share music with the ♪ button.")
+        }
+        .sheet(isPresented: $showRooms) {
+            RoomBrowserSheet(model: model) { room in
+                model.joinRoom(room)
+                showRooms = false
+                navTarget = "room:\(room)"
+            }
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { navTarget != nil },
+            set: { if !$0 { navTarget = nil } }
+        )) {
+            if let id = navTarget {
+                ConversationView(chatModel: model, appModel: appModel, id: id)
+            }
+        }
+    }
+
+    private func preview(_ conv: ChatEngine.Conversation) -> String {
+        guard let last = conv.messages.last else {
+            return conv.kind == .room ? "\(conv.members.count) members" : "No messages yet"
+        }
+        if let card = last.card { return "♪ \(card.title)" }
+        if last.isSystem { return last.text }
+        return (last.isMine ? "You: " : "") + last.text
+    }
+}
+
+struct ConversationView: View {
+    let chatModel: ChatModel
+    let appModel: AppModel
+    let id: String
+
+    @State private var draft = ""
+    @State private var showSharePicker = false
+
+    private var conv: ChatEngine.Conversation? { chatModel.conversation(id) }
+    private var isRoom: Bool { id.hasPrefix("room:") }
+    private var name: String {
+        conv?.name ?? String(id.dropFirst(isRoom ? 5 : 3))
+    }
+
+    var body: some View {
+        ZStack {
+            GlassBackground()
+            VStack(spacing: 0) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(conv?.messages ?? []) { msg in
+                                MessageBubble(message: msg) { card in
+                                    appModel.searchModel.download(path: card.path, size: card.size, from: card.username)
+                                }
+                                .id(msg.id)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                    }
+                    .onChange(of: conv?.messages.count) { _, _ in
+                        if let last = conv?.messages.last {
+                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                        }
+                    }
+                }
+                composer
+            }
+        }
+        .navigationTitle(name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isRoom {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Leave") {
+                        chatModel.leaveRoom(name)
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("leaveRoomButton")
+                }
+            }
+        }
+        .sheet(isPresented: $showSharePicker) {
+            SharePickerSheet(groups: appModel.searchModel.groups) { file, username in
+                chatModel.share(MusicCard(username: username, path: file.path, size: file.size), to: id)
+                showSharePicker = false
+            }
+        }
+    }
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var composer: some View {
+        HStack(spacing: 10) {
+            Button { showSharePicker = true } label: {
+                Image(systemName: "music.note")
+                    .font(.title3)
+                    .foregroundStyle(.orange)
+            }
+            .accessibilityIdentifier("shareMusicButton")
+            TextField("Message", text: $draft)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .accessibilityIdentifier("messageField")
+                .onSubmit(send)
+            Button(action: send) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.orange)
+            }
+            .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            .accessibilityIdentifier("sendButton")
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    private func send() {
+        let text = draft.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+        if isRoom {
+            chatModel.say(in: name, text: text)
+        } else {
+            chatModel.sendPM(to: name, text: text)
+        }
+        draft = ""
+    }
+}
+
+struct MessageBubble: View {
+    let message: ChatEngine.ChatMessage
+    let onDownload: (MusicCard) -> Void
+
+    var body: some View {
+        if message.isSystem {
+            Text(message.text)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+        } else if let card = message.card {
+            VStack(alignment: message.isMine ? .trailing : .leading, spacing: 2) {
+                if !message.isMine {
+                    Text(message.sender)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                MusicCardRow(card: card) { onDownload(card) }
+            }
+            .frame(maxWidth: .infinity, alignment: message.isMine ? .trailing : .leading)
+        } else {
+            VStack(alignment: message.isMine ? .trailing : .leading, spacing: 2) {
+                if !message.isMine {
+                    Text(message.sender)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(message.text)
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .glassEffect(.regular.tint(message.isMine ? Color.orange.opacity(0.35) : .clear), in: .rect(cornerRadius: 16))
+            }
+            .frame(maxWidth: .infinity, alignment: message.isMine ? .trailing : .leading)
+            .accessibilityIdentifier("messageBubble")
+        }
+    }
+}
+
+struct MusicCardRow: View {
+    let card: MusicCard
+    let onDownload: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "music.note")
+                .font(.title3)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(card.title)
+                    .font(.subheadline)
+                    .lineLimit(2)
+                    .accessibilityIdentifier("musicCard")
+                Text("\(card.username) · \(String(format: "%.1f MB", Double(card.size) / 1_048_576))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(action: onDownload) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("cardDownloadButton")
+        }
+        .padding(10)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+    }
+}
+
+/// Pick a file from the current search results to share into the chat.
+struct SharePickerSheet: View {
+    let groups: [SearchModel.ResultGroup]
+    let onSelect: (FileEntry, String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                GlassBackground()
+                List {
+                    ForEach(groups) { group in
+                        Section(group.username) {
+                            ForEach(group.files.prefix(20), id: \.path) { file in
+                                Button {
+                                    onSelect(file, group.username)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(file.filename)
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+                                        Text("\(file.ext.uppercased()) · \(String(format: "%.1f MB", Double(file.size) / 1_048_576))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .accessibilityIdentifier("shareFileRow")
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if groups.isEmpty {
+                        ContentUnavailableView(
+                            "Nothing to share yet",
+                            systemImage: "magnifyingglass",
+                            description: Text("Search for music first, then share results into the chat.")
+                        )
+                    }
+                }
+            }
+            .navigationTitle("Share music")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct RoomBrowserSheet: View {
+    let model: ChatModel
+    let onJoin: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let list = model.roomList {
+                    Section("Public groups") {
+                        ForEach(list.publicRooms.sorted { $0.userCount > $1.userCount }, id: \.name) { room in
+                            Button { onJoin(room.name) } label: {
+                                HStack {
+                                    Text(room.name)
+                                    Spacer()
+                                    Text("\(room.userCount)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    if !list.ownedPrivateRooms.isEmpty {
+                        Section("Your private groups") {
+                            ForEach(list.ownedPrivateRooms, id: \.name) { room in
+                                Button { onJoin(room.name) } label: {
+                                    HStack {
+                                        Text(room.name)
+                                        Spacer()
+                                        Text("\(room.userCount)")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    ProgressView("Loading groups…")
+                }
+            }
+            .navigationTitle("Groups")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
