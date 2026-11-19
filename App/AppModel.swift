@@ -57,6 +57,7 @@ final class AppModel {
     let shareIndex: ShareIndex
     let uploadEngine: UploadEngine
     let uploadsModel: UploadsModel
+    let libraryModel: LibraryModel
     private let connection = ServerConnection()
     private let keychain = KeychainStore()
     private var stateTask: Task<Void, Never>?
@@ -107,6 +108,7 @@ final class AppModel {
         let buddies = BuddyEngine(server: connection, storeURL: support.appendingPathComponent("buddies.json"))
         buddyEngine = buddies
         buddyModel = BuddyModel(engine: buddies)
+        libraryModel = LibraryModel(directory: documents.appendingPathComponent("Downloads"))
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }
@@ -121,6 +123,12 @@ final class AppModel {
             try? FileManager.default.createDirectory(at: seed, withIntermediateDirectories: true)
             try? Data((0..<2048).map { UInt8($0 % 251) }).write(to: seed.appendingPathComponent("seed track.mp3"))
             Task { await shareIndex.addRoot(seed.path); await announceShares() }
+        }
+        if CommandLine.arguments.contains("-UITestSeedLibrary") {
+            let downloads = documents.appendingPathComponent("Downloads")
+            try? FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+            try? Data((0..<4096).map { UInt8($0 % 251) }).write(to: downloads.appendingPathComponent("Seed Track.mp3"))
+            libraryModel.refresh()
         }
         if let saved = try? keychain.load() {
             username = saved.username

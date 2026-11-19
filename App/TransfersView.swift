@@ -14,6 +14,7 @@ struct TransfersView: View {
                 Picker("Transfers", selection: $segment) {
                     Text("Downloads").tag(0)
                     Text("Uploads").tag(1)
+                    Text("Library").tag(2)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -21,8 +22,10 @@ struct TransfersView: View {
 
                 if segment == 0 {
                     downloadsList
-                } else {
+                } else if segment == 1 {
                     uploadsList
+                } else {
+                    LibraryView(model: appModel.libraryModel)
                 }
             }
         }
