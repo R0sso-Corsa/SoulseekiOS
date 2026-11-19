@@ -363,6 +363,73 @@ final class ChatEngineTests: XCTestCase {
         let conv = await chat.conversations.first { $0.id == "room:jazz" }
         XCTAssertEqual(conv?.isPrivate, false)
     }
+
+    /// Chats survive an engine restart (app relaunch): PM history + room
+    /// state restore from disk, and rejoinRooms re-sends JoinRoom with the
+    /// persisted room type.
+    func testChatPersistenceAndRejoin() async throws {
+        let store = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chat-persist-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: store) }
+
+        // Session 1: receive a PM, join a private room, send a PM.
+        let server1 = try FakeServer()
+        defer { server1.close() }
+        let conn1 = ServerConnection()
+        let chat1 = ChatEngine(server: conn1, storeURL: store)
+        try await login(conn1, server1)
+
+        var pm = MessageWriter()
+        pm.u32(77)
+        pm.u32(UInt32(Date().timeIntervalSince1970))
+        pm.string("alice")
+        pm.string("hello persist")
+        pm.u8(1)
+        try server1.send(pm.frame(code: 22))
+        let gotPM = await waitFor(chat1) { $0.contains { $0.id == "pm:alice" } }
+        XCTAssertTrue(gotPM, "PM not received")
+        _ = try server1.readFrame() // MessageAcked(23)
+
+        await chat1.joinRoom("vault", private: true)
+        _ = try server1.readFrame() // JoinRoom
+        try server1.send(Data(hexString: "050000007661756c740100000003000000626f62010000000200000001000000e80300000500000000000000640000000a000000010000000000000001000000020000005553060000007465737465720100000005000000616c696365").framePayloadAsCode(14))
+        let gotRoom = await waitFor(chat1) { $0.contains { $0.id == "room:vault" && $0.isPrivate } }
+        XCTAssertTrue(gotRoom, "private room not joined")
+
+        await chat1.sendPrivateMessage(to: "alice", text: "my reply")
+        _ = try server1.readFrame() // MessageUser(22)
+        await chat1.shutdown() // flushes the save
+        await conn1.disconnect()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.path), "history file not written")
+
+        // Session 2: fresh engine + connection, same store file.
+        let server2 = try FakeServer()
+        defer { server2.close() }
+        let conn2 = ServerConnection()
+        let chat2 = ChatEngine(server: conn2, storeURL: store)
+        try await login(conn2, server2)
+        addTeardownBlock { await chat2.shutdown(); await conn2.disconnect() }
+
+        let restored = await chat2.conversations
+        let pmConv = restored.first { $0.id == "pm:alice" }
+        XCTAssertNotNil(pmConv, "PM conversation lost")
+        XCTAssertTrue(pmConv?.messages.contains { $0.text == "hello persist" && $0.serverID == 77 } == true,
+                      "received PM history lost")
+        XCTAssertTrue(pmConv?.messages.contains { $0.text == "my reply" && $0.isMine } == true,
+                      "sent PM history lost")
+        let roomConv = restored.first { $0.id == "room:vault" }
+        XCTAssertEqual(roomConv?.isPrivate, true, "private flag lost")
+        XCTAssertEqual(roomConv?.owner, "tester", "owner lost")
+        XCTAssertEqual(roomConv?.operators, ["alice"], "operators lost")
+
+        // Rejoin sends JoinRoom with the persisted type (1 = private).
+        await chat2.rejoinRooms()
+        let rejoin = try server2.readFrame()
+        XCTAssertEqual(rejoin.code, 14)
+        var rr = MessageReader(rejoin.payload)
+        XCTAssertEqual(try rr.string(), "vault")
+        XCTAssertEqual(try rr.u32(), 1)
+    }
 }
 
 private extension Data {

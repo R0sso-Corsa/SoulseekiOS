@@ -60,12 +60,34 @@ public actor ChatEngine {
 
     private let server: ServerConnection
     private var eventTask: Task<Void, Never>?
+    private let storeURL: URL?
+    private var saveTask: Task<Void, Never>?
 
-    public init(server: ServerConnection) {
+    public init(server: ServerConnection, storeURL: URL? = nil) {
         self.server = server
+        self.storeURL = storeURL
         var cont: AsyncStream<[Conversation]>.Continuation?
         updates = AsyncStream { cont = $0 }
         updatesContinuation = cont!
+        // Restore persisted chats before any events arrive.
+        if let storeURL, let data = try? Data(contentsOf: storeURL),
+           let snap = try? JSONDecoder().decode(ChatSnapshot.self, from: data) {
+            conversations = snap.conversations.map { c in
+                var conv = Conversation(id: c.id, kind: c.kind == "room" ? .room : .pm, name: c.name)
+                conv.messages = c.messages.map {
+                    ChatMessage(serverID: $0.serverID, sender: $0.sender, text: $0.text,
+                                date: $0.date, isMine: $0.isMine, isSystem: $0.isSystem)
+                }
+                conv.owner = c.owner
+                conv.isPrivate = c.isPrivate
+                conv.privateMembers = c.privateMembers
+                conv.operators = c.operators
+                conv.lastActivity = c.lastActivity
+                return conv
+            }
+            // Seed the UI stream so restored chats appear before any event.
+            updatesContinuation.yield(conversations)
+        }
         eventTask = Task { await self.consumeEvents() }
     }
 
@@ -76,6 +98,70 @@ public actor ChatEngine {
     public func shutdown() async {
         eventTask?.cancel()
         eventTask = nil
+        saveTask?.cancel()
+        saveNow()
+    }
+
+    /// Rejoin persisted rooms after (re)connect — the server does not remember
+    /// our room memberships across sessions. Uses the persisted room type;
+    /// this is a rejoin, not a create (no collision detection).
+    public func rejoinRooms() async {
+        for conv in conversations where conv.kind == .room {
+            try? await server.send(frame: ServerMessages.joinRoom(room: conv.name, type: conv.isPrivate ? 1 : 0))
+        }
+    }
+
+    // MARK: - Persistence
+
+    private struct ChatSnapshot: Codable {
+        struct Msg: Codable {
+            let serverID: UInt32?
+            let sender: String
+            let text: String
+            let date: Date
+            let isMine: Bool
+            let isSystem: Bool
+        }
+        struct Conv: Codable {
+            let id: String
+            let kind: String
+            let name: String
+            let messages: [Msg]
+            let owner: String?
+            let isPrivate: Bool
+            let privateMembers: [String]
+            let operators: [String]
+            let lastActivity: Date
+        }
+        let conversations: [Conv]
+    }
+
+    private func scheduleSave() {
+        guard storeURL != nil else { return }
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.saveNow()
+        }
+    }
+
+    private func saveNow() {
+        guard let storeURL else { return }
+        let snap = ChatSnapshot(conversations: conversations.map { c in
+            ChatSnapshot.Conv(
+                id: c.id, kind: c.kind.rawValue, name: c.name,
+                messages: c.messages.suffix(200).map {
+                    ChatSnapshot.Msg(serverID: $0.serverID, sender: $0.sender, text: $0.text,
+                                     date: $0.date, isMine: $0.isMine, isSystem: $0.isSystem)
+                },
+                owner: c.owner, isPrivate: c.isPrivate,
+                privateMembers: c.privateMembers, operators: c.operators,
+                lastActivity: c.lastActivity)
+        })
+        if let data = try? JSONEncoder().encode(snap) {
+            try? data.write(to: storeURL, options: .atomic)
+        }
     }
 
     // MARK: - Sending
@@ -386,5 +472,6 @@ public actor ChatEngine {
 
     private func publish() {
         updatesContinuation.yield(conversations)
+        scheduleSave()
     }
 }

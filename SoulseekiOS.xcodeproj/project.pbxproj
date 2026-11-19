@@ -12,6 +12,7 @@
 		0FD02D8C286A25736AECDD9C /* FilterUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301680BE77400AB4AFFFE7C9 /* FilterUITests.swift */; };
 		13F8BB00A9BB3AEDD50CD7CE /* SearchModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D771E7F90F60B1F8D953E13 /* SearchModel.swift */; };
 		143C8837127414BF1AAC57F7 /* ChatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */; };
+		146483FDBF463B2A5C4FE69C /* ChatPersistenceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE4A7FBFCE4B5BC4B057BDB8 /* ChatPersistenceUITests.swift */; };
 		16D3FF2D3F4AECDB50FD2EB6 /* BuddiesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89BCD62519A2113F7AB496D /* BuddiesSheet.swift */; };
 		179A7B1662AFC910214D7C37 /* BuddiesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC4E2B289A158B12D55685D /* BuddiesUITests.swift */; };
 		2D3FDE9A541C95D9675FCF37 /* ConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B05165D9BA257D45076858 /* ConnectedView.swift */; };
@@ -102,6 +103,7 @@
 		CB551712E7C2969C653F1452 /* PrivateRoomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateRoomSheet.swift; sourceTree = "<group>"; };
 		D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
 		DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistModel.swift; sourceTree = "<group>"; };
+		DE4A7FBFCE4B5BC4B057BDB8 /* ChatPersistenceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPersistenceUITests.swift; sourceTree = "<group>"; };
 		DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SoulseekiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFC4E2B289A158B12D55685D /* BuddiesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddiesUITests.swift; sourceTree = "<group>"; };
 		E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulseekiOSApp.swift; sourceTree = "<group>"; };
@@ -131,6 +133,7 @@
 				349C4FAAF8188B9ABC51F2A6 /* BackgroundResumeUITests.swift */,
 				B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */,
 				DFC4E2B289A158B12D55685D /* BuddiesUITests.swift */,
+				DE4A7FBFCE4B5BC4B057BDB8 /* ChatPersistenceUITests.swift */,
 				F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */,
 				301680BE77400AB4AFFFE7C9 /* FilterUITests.swift */,
 				430B2D84DDAEB7585BD164E0 /* LibraryUITests.swift */,
@@ -342,6 +345,7 @@
 				CB61047397122EE1103D288A /* BackgroundResumeUITests.swift in Sources */,
 				32EF6437B534850DF69213E1 /* BrowseUITests.swift in Sources */,
 				179A7B1662AFC910214D7C37 /* BuddiesUITests.swift in Sources */,
+				146483FDBF463B2A5C4FE69C /* ChatPersistenceUITests.swift in Sources */,
 				143C8837127414BF1AAC57F7 /* ChatUITests.swift in Sources */,
 				0FD02D8C286A25736AECDD9C /* FilterUITests.swift in Sources */,
 				C6334CB6336DC1C49336B41F /* LibraryUITests.swift in Sources */,

@@ -100,7 +100,11 @@ final class AppModel {
         searchModel = SearchModel(engine: searchEngine, transferEngine: transfers)
         transfersModel = TransfersModel(engine: transfers)
         uploadsModel = UploadsModel(engine: ups)
-        chatEngine = ChatEngine(server: connection)
+        if CommandLine.arguments.contains("-UITestResetCredentials") {
+            try? keychain.delete()
+            try? FileManager.default.removeItem(at: support.appendingPathComponent("chat-history.json"))
+        }
+        chatEngine = ChatEngine(server: connection, storeURL: support.appendingPathComponent("chat-history.json"))
         chatModel = ChatModel(engine: chatEngine)
         wishlistEngine = WishlistEngine(server: connection, searchEngine: searchEngine,
                                         storeURL: support.appendingPathComponent("wishlist.json"))
@@ -109,9 +113,6 @@ final class AppModel {
         buddyEngine = buddies
         buddyModel = BuddyModel(engine: buddies)
         libraryModel = LibraryModel(directory: documents.appendingPathComponent("Downloads"))
-        if CommandLine.arguments.contains("-UITestResetCredentials") {
-            try? keychain.delete()
-        }
         if CommandLine.arguments.contains("-UITestResetSettings") {
             UserDefaults.standard.removeObject(forKey: "slsk.wiFiOnly")
             UserDefaults.standard.removeObject(forKey: "slsk.downLimit")
@@ -313,6 +314,8 @@ final class AppModel {
             Task { await buddyEngine.refreshAll() }
             // Accept private-room invitations (server default is off).
             Task { await chatEngine.setInvitationsEnabled(true) }
+            // Rejoin persisted rooms — the server forgets memberships across sessions.
+            Task { await chatEngine.rejoinRooms() }
         case .failed(let reason):
             phase = .failed(reason)
             Task { await searchEngine.stopListening() }
