@@ -57,6 +57,8 @@ final class AppModel {
         shareIndex = ShareIndex(storeURL: support.appendingPathComponent("shares.json"))
         let ups = UploadEngine(server: connection, index: shareIndex)
         uploadEngine = ups
+        let coordinator = PortMapCoordinator(connection: connection)
+        portMapCoordinator = coordinator
         searchEngine = SearchEngine(server: connection,
             onFileConnection: { link, pending in
                 await transfers.handleDirectFile(link, pending: pending)
@@ -67,6 +69,9 @@ final class AppModel {
             onPierce: { link, ticket, pending in
                 if await transfers.handleIndirectP(link, ticket: ticket, pending: pending) { return true }
                 return await ups.handleIndirectUpload(link, ticket: ticket, pending: pending)
+            },
+            onListenPort: { port in
+                await coordinator.map(port)
             })
         searchModel = SearchModel(engine: searchEngine, transferEngine: transfers)
         transfersModel = TransfersModel(engine: transfers)
@@ -187,6 +192,10 @@ final class AppModel {
         try? await connection.send(frame: ServerMessages.sharedFoldersFiles(folders: UInt32(folders), files: UInt32(files)))
     }
 
+    // MARK: - NAT port mapping
+
+    private let portMapCoordinator: PortMapCoordinator
+
     func signOut() {
         try? keychain.delete()
         username = ""
@@ -262,6 +271,28 @@ final class AppModel {
             default:
                 break
             }
+        }
+    }
+}
+
+/// NAT-PMP on the listener port; on success re-advertises the EXTERNAL port
+/// to the server and refreshes at half the lease. Silent degradation: without
+/// a mapping the indirect (server-brokered) path keeps working.
+private actor PortMapCoordinator {
+    private let connection: ServerConnection
+    private var task: Task<Void, Never>?
+
+    init(connection: ServerConnection) {
+        self.connection = connection
+    }
+
+    func map(_ port: UInt16) async {
+        task?.cancel()
+        guard let mapping = await PortMapper().mapTCP(internalPort: port) else { return }
+        try? await connection.send(frame: ServerMessages.setListenPort(UInt32(mapping.externalPort)))
+        task = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: UInt64(mapping.lifetime) * 500_000_000) } catch { return }
+            await self?.map(port)
         }
     }
 }

@@ -34,17 +34,22 @@ public actor SearchEngine {
     /// Inbound PierceFw: ticket-routed to whichever engine owns it
     /// (indirect-P download response OR indirect-F upload). True = consumed.
     private let onPierce: (@Sendable (PeerLink, UInt32, Data) async -> Bool)?
+    /// Listener ready — lets the app attempt NAT port mapping and re-advertise
+    /// the external port to the server.
+    private let onListenPort: (@Sendable (UInt16) async -> Void)?
 
     public init(
         server: ServerConnection,
         onFileConnection: (@Sendable (PeerLink, Data) async -> Void)? = nil,
         onUploadRequest: (@Sendable (PeerLink, String, String, Data) async -> Void)? = nil,
-        onPierce: (@Sendable (PeerLink, UInt32, Data) async -> Bool)? = nil
+        onPierce: (@Sendable (PeerLink, UInt32, Data) async -> Bool)? = nil,
+        onListenPort: (@Sendable (UInt16) async -> Void)? = nil
     ) {
         self.server = server
         self.onFileConnection = onFileConnection
         self.onUploadRequest = onUploadRequest
         self.onPierce = onPierce
+        self.onListenPort = onListenPort
         var continuation: AsyncStream<State>.Continuation?
         states = AsyncStream { continuation = $0 }
         stateContinuation = continuation!
@@ -88,6 +93,7 @@ public actor SearchEngine {
         state.listenPort = port
         publish()
         try? await server.send(frame: ServerMessages.setListenPort(UInt32(port)))
+        await onListenPort?(port)
     }
 
     // MARK: - Searching
