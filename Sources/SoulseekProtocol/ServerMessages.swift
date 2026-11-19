@@ -161,6 +161,21 @@ public enum ServerMessages {
         w.string(query)
         return w.frame(code: 103)
     }
+
+    /// Code 35. Announce shared folder/file counts (re-send after share changes).
+    public static func sharedFoldersFiles(folders: UInt32, files: UInt32) -> Data {
+        var w = MessageWriter()
+        w.u32(folders)
+        w.u32(files)
+        return w.frame(code: 35)
+    }
+
+    /// Code 121. Report our upload speed after a finished upload.
+    public static func sendUploadSpeed(_ speed: UInt32) -> Data {
+        var w = MessageWriter()
+        w.u32(speed)
+        return w.frame(code: 121)
+    }
 }
 
 /// Post-login handshake for a receive-only client (AD-5): no listener yet,

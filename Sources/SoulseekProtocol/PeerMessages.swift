@@ -48,6 +48,22 @@ public enum PeerMessages {
     public static func sharedFileListRequest() -> Data {
         MessageWriter().frame(code: 4)
     }
+
+    /// Code 50. Reject a queued download with a reason.
+    public static func queueFailed(filename: String, reason: String) -> Data {
+        var w = MessageWriter()
+        w.string(filename)
+        w.string(reason)
+        return w.frame(code: 50)
+    }
+
+    /// Code 44. Tell the downloader their place in our upload queue.
+    public static func placeInQueueReply(filename: String, place: UInt32) -> Data {
+        var w = MessageWriter()
+        w.string(filename)
+        w.u32(place)
+        return w.frame(code: 44)
+    }
 }
 
 /// PeerTransferRequest (40) received from an uploader when a slot frees.
