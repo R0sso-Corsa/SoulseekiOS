@@ -56,14 +56,29 @@ final class LiveTransferTests: XCTestCase {
         for candidate in candidates {
             await engine.download(username: candidate.user, filename: candidate.file, size: candidate.size)
         }
-        let deadline = Date().addingTimeInterval(150)
+        let deadline = Date().addingTimeInterval(180)
         var completedTransfer: TransferEngine.Transfer?
+        var reconnected = false
         while Date() < deadline {
             try await Task.sleep(nanoseconds: 1_000_000_000)
             let all = await engine.transfers
             if let done = all.first(where: { $0.state == .completed }) {
                 completedTransfer = done
                 break
+            }
+            // Transient server drops kill in-flight transfers: reconnect once
+            // and re-queue the failed ones before giving up.
+            if !reconnected {
+                if case .connected = await conn.state {} else {
+                    await conn.connect(username: user, password: pass)
+                    if case .connected = await conn.state {
+                        reconnected = true
+                        for t in all {
+                            if case .failed = t.state { await engine.retry(t.id) }
+                        }
+                        continue
+                    }
+                }
             }
             if all.allSatisfy({ t in
                 if case .failed = t.state { return true }

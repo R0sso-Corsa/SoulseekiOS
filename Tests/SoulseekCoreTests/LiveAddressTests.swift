@@ -28,6 +28,14 @@ final class LiveAddressTests: XCTestCase {
             state = await search.state
         }
         XCTAssertFalse(state.replies.isEmpty, "no search replies")
+        // Transient server drops happen; reconnect once if needed.
+        if case .connected = await conn.state {} else {
+            await conn.connect(username: user, password: pass)
+            guard case .connected = await conn.state else {
+                XCTFail("reconnect failed: \(await conn.state)")
+                return
+            }
+        }
         for reply in state.replies.prefix(3) {
             let addr = try await conn.peerAddress(for: reply.username)
             print("LIVE ADDR: \(reply.username) -> \(addr.ip):\(addr.port) online=\(addr.isOnline)")
