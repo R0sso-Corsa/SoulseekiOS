@@ -72,6 +72,23 @@ public enum ServerMessages {
         w.string(username)
         return w.frame(code: 127)
     }
+
+    /// Code 26. Global search: ticket + query. Results arrive asynchronously
+    /// as PeerSearchReply(9) on peer connections.
+    public static func fileSearch(ticket: UInt32, query: String) -> Data {
+        var w = MessageWriter()
+        w.u32(ticket)
+        w.string(query)
+        return w.frame(code: 26)
+    }
+
+    /// Code 1001. Report a failed indirect connection attempt back to the server.
+    public static func cannotConnect(ticket: UInt32, username: String) -> Data {
+        var w = MessageWriter()
+        w.u32(ticket)
+        w.string(username)
+        return w.frame(code: 1001)
+    }
 }
 
 /// Post-login handshake for a receive-only client (AD-5): no listener yet,

@@ -81,6 +81,14 @@ public struct MessageWriter {
         header.u32(code)
         return Data(header.bytes + bytes)
     }
+
+    /// Peer-init framing: u8 code instead of u32.
+    public func frame(initCode: UInt8) -> Data {
+        var header = MessageWriter()
+        header.u32(UInt32(bytes.count + 1))
+        header.u8(initCode)
+        return Data(header.bytes + bytes)
+    }
 }
 
 /// Cursor over a frame payload.
