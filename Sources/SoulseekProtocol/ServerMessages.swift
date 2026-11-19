@@ -110,6 +110,49 @@ public enum ServerMessages {
         w.string(username)
         return w.frame(code: 7)
     }
+
+    /// Code 22. Send a private message.
+    public static func messageUser(username: String, message: String) -> Data {
+        var w = MessageWriter()
+        w.string(username)
+        w.string(message)
+        return w.frame(code: 22)
+    }
+
+    /// Code 23. Acknowledge a private message (server resends until acked).
+    public static func messageAcked(id: UInt32) -> Data {
+        var w = MessageWriter()
+        w.u32(id)
+        return w.frame(code: 23)
+    }
+
+    /// Code 13. Say something in a chat room.
+    public static func sayInRoom(room: String, message: String) -> Data {
+        var w = MessageWriter()
+        w.string(room)
+        w.string(message)
+        return w.frame(code: 13)
+    }
+
+    /// Code 14. Join (or create, if nonexistent) a room. type: 0 public, 1 private.
+    public static func joinRoom(room: String, type: UInt32) -> Data {
+        var w = MessageWriter()
+        w.string(room)
+        w.u32(type)
+        return w.frame(code: 14)
+    }
+
+    /// Code 15. Leave a room.
+    public static func leaveRoom(room: String) -> Data {
+        var w = MessageWriter()
+        w.string(room)
+        return w.frame(code: 15)
+    }
+
+    /// Code 64. Request the full room list (empty payload).
+    public static func roomList() -> Data {
+        MessageWriter().frame(code: 64)
+    }
 }
 
 /// Post-login handshake for a receive-only client (AD-5): no listener yet,
