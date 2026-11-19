@@ -17,7 +17,7 @@ public actor ServerConnection {
     public enum ConnectionError: Error { case notConnected }
 
     public private(set) var state: State = .disconnected
-    public let states: AsyncStream<State>
+    public nonisolated let states: AsyncStream<State>
     private let stateContinuation: AsyncStream<State>.Continuation
 
     private var connection: NWConnection?

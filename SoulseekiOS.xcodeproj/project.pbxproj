@@ -8,14 +8,34 @@
 
 /* Begin PBXBuildFile section */
 		07189AB8FABD5748B2078511 /* SoulseekProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 2F834DD811A762594B18F0BD /* SoulseekProtocol */; };
+		0CFBB8B6911CA93CC8914733 /* SoulseekCore in Frameworks */ = {isa = PBXBuildFile; productRef = 77A5C986D02FC47ACBD9083B /* SoulseekCore */; };
+		2D3FDE9A541C95D9675FCF37 /* ConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B05165D9BA257D45076858 /* ConnectedView.swift */; };
 		32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */; };
 		4BEED639ADEB8E26647ACF28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FA896C59EBF67275ACDD076 /* Assets.xcassets */; };
+		A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */; };
+		ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACC65140334C67989CF2407 /* LoginView.swift */; };
+		BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469C71F2B052D3754B85DF9A /* AppModel.swift */; };
 		FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E50120037E89A83F6D9B65 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		D335A7983F706DFB9FD3B66F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAE02724BE356355420D7C3F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B9E33F0D13381CFDA97B93D2;
+			remoteInfo = SoulseekiOS;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		10B05165D9BA257D45076858 /* ConnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedView.swift; sourceTree = "<group>"; };
 		3FA896C59EBF67275ACDD076 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		469C71F2B052D3754B85DF9A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginUITests.swift; sourceTree = "<group>"; };
+		7ACC65140334C67989CF2407 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A7E50120037E89A83F6D9B65 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AE47E1E44AAB78905BDF28F6 /* SoulseekiOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SoulseekiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SoulseekiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulseekiOSApp.swift; sourceTree = "<group>"; };
 		F41AA9BE35D4320C5763AE59 /* SoulseekiOS */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SoulseekiOS; path = .; sourceTree = SOURCE_ROOT; };
@@ -27,16 +47,26 @@
 			buildActionMask = 2147483647;
 			files = (
 				07189AB8FABD5748B2078511 /* SoulseekProtocol in Frameworks */,
+				0CFBB8B6911CA93CC8914733 /* SoulseekCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0B4DA347CD42C68A2021B584 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		5942C741E5969A374468EF46 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */,
+				AE47E1E44AAB78905BDF28F6 /* SoulseekiOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -46,6 +76,7 @@
 			children = (
 				DCB4E60AF0BCDFA287AD2123 /* App */,
 				986BBEE66A219A9B8009CAF0 /* Packages */,
+				0B4DA347CD42C68A2021B584 /* UITests */,
 				5942C741E5969A374468EF46 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,8 +92,11 @@
 		DCB4E60AF0BCDFA287AD2123 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				469C71F2B052D3754B85DF9A /* AppModel.swift */,
 				3FA896C59EBF67275ACDD076 /* Assets.xcassets */,
+				10B05165D9BA257D45076858 /* ConnectedView.swift */,
 				A7E50120037E89A83F6D9B65 /* ContentView.swift */,
+				7ACC65140334C67989CF2407 /* LoginView.swift */,
 				E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */,
 			);
 			path = App;
@@ -71,6 +105,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		4F2F87F31CEEDFF0C5585D7B /* SoulseekiOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 31E58AC92B467D12F1961BFF /* Build configuration list for PBXNativeTarget "SoulseekiOSUITests" */;
+			buildPhases = (
+				BE29B7A308C8D359EF3CE3C6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				42C745CA1FF9360FA37EE3E9 /* PBXTargetDependency */,
+			);
+			name = SoulseekiOSUITests;
+			packageProductDependencies = (
+			);
+			productName = SoulseekiOSUITests;
+			productReference = AE47E1E44AAB78905BDF28F6 /* SoulseekiOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		B9E33F0D13381CFDA97B93D2 /* SoulseekiOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8A17BE0C0F48275C1BD7EDE4 /* Build configuration list for PBXNativeTarget "SoulseekiOS" */;
@@ -86,6 +138,7 @@
 			name = SoulseekiOS;
 			packageProductDependencies = (
 				2F834DD811A762594B18F0BD /* SoulseekProtocol */,
+				77A5C986D02FC47ACBD9083B /* SoulseekCore */,
 			);
 			productName = SoulseekiOS;
 			productReference = DF53B7829351F53CBFF910F7 /* SoulseekiOS.app */;
@@ -100,6 +153,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					4F2F87F31CEEDFF0C5585D7B = {
+						TestTargetID = B9E33F0D13381CFDA97B93D2;
+					};
 					B9E33F0D13381CFDA97B93D2 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -123,6 +179,7 @@
 			projectRoot = "";
 			targets = (
 				B9E33F0D13381CFDA97B93D2 /* SoulseekiOS */,
+				4F2F87F31CEEDFF0C5585D7B /* SoulseekiOSUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -143,12 +200,31 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */,
+				2D3FDE9A541C95D9675FCF37 /* ConnectedView.swift in Sources */,
 				FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */,
+				ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */,
 				32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BE29B7A308C8D359EF3CE3C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		42C745CA1FF9360FA37EE3E9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B9E33F0D13381CFDA97B93D2 /* SoulseekiOS */;
+			targetProxy = D335A7983F706DFB9FD3B66F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		6CE155936AB18281E0DA8FD5 /* Debug */ = {
@@ -320,9 +396,54 @@
 			};
 			name = Debug;
 		};
+		D7D056285D6C157FBAEF325B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericparonikyan.SoulseekiOSUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SoulseekiOS;
+			};
+			name = Release;
+		};
+		F5C299705B8B0C1288216009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericparonikyan.SoulseekiOSUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SoulseekiOS;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		31E58AC92B467D12F1961BFF /* Build configuration list for PBXNativeTarget "SoulseekiOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F5C299705B8B0C1288216009 /* Debug */,
+				D7D056285D6C157FBAEF325B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		8A17BE0C0F48275C1BD7EDE4 /* Build configuration list for PBXNativeTarget "SoulseekiOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -354,6 +475,10 @@
 		2F834DD811A762594B18F0BD /* SoulseekProtocol */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SoulseekProtocol;
+		};
+		77A5C986D02FC47ACBD9083B /* SoulseekCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SoulseekCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
