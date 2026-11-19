@@ -210,4 +210,134 @@ final class TransferEngineTests: XCTestCase {
         await engine.shutdown()
         await conn.disconnect()
     }
+
+    /// Both peers firewalled: address online but unreachable → ConnectToPeer(P)
+    /// → uploader dials our listener (PierceFw) → QueueDownload → TransferRequest
+    /// → Reply → ConnectToPeer(F) → we dial uploader → ticket/offset → bytes.
+    func testDownloadIndirectPAndF() async throws {
+        let server = try FakeServer()
+        let uploader = try FakeServer()
+        defer { server.close(); uploader.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir)
+        let search = SearchEngine(server: conn,
+            onFileConnection: { link, pending in await engine.handleDirectFile(link, pending: pending) },
+            onPierce: { link, ticket, pending in await engine.handleIndirectP(link, ticket: ticket, pending: pending) })
+        try await login(conn, server)
+        await search.startListening()
+        addTeardownBlock { await engine.shutdown(); await search.shutdown(); await conn.disconnect() }
+        var listenPort: UInt16 = 0
+        let portDeadline = Date().addingTimeInterval(5)
+        while Date() < portDeadline {
+            listenPort = await search.state.listenPort
+            if listenPort > 0 { break }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertGreaterThan(listenPort, 0)
+        let portFrame = try server.readFrame()
+        XCTAssertEqual(portFrame.code, 2)
+
+        let file = "@@music\\Test\\song.mp3"
+        let payload = Data((0..<2048).map { UInt8($0 % 251) })
+        await engine.download(username: "uploader", filename: file, size: UInt64(payload.count))
+
+        // Online but unreachable port → direct dial refused → indirect P request.
+        try sendAddressReply(server, username: "uploader", port: 1)
+        let ctp = try server.readFrame()
+        XCTAssertEqual(ctp.code, 18)
+        var cr = MessageReader(ctp.payload)
+        let pTicket = try cr.u32()
+        XCTAssertEqual(try cr.string(), "uploader")
+        XCTAssertEqual(try cr.string(), "P")
+
+        // Uploader dials our listener and pierces; we send QueueDownload.
+        let fd = try dialListener(port: listenPort)
+        defer { Darwin.close(fd) }
+        try sendAll(fd, PeerInitMessages.pierceFirewall(ticket: pTicket))
+        var qReader = FrameReader()
+        var queueFrame: Frame?
+        let qDeadline = Date().addingTimeInterval(10)
+        while Date() < qDeadline && queueFrame == nil {
+            var buf = [UInt8](repeating: 0, count: 65536)
+            let n = recv(fd, &buf, buf.count, 0)
+            guard n > 0 else { break }
+            qReader.append(Data(buf[0..<n]))
+            queueFrame = try qReader.next()
+        }
+        let queue = try XCTUnwrap(queueFrame)
+        XCTAssertEqual(queue.code, 43)
+
+        // Uploader sends TransferRequest; we reply allowed.
+        let fTicket: UInt32 = 777
+        try sendAll(fd, PeerMessages.transferRequest(direction: 1, ticket: fTicket, filename: file, filesize: UInt64(payload.count)))
+        var rReader = FrameReader()
+        var replyFrame: Frame?
+        let rDeadline = Date().addingTimeInterval(10)
+        while Date() < rDeadline && replyFrame == nil {
+            var buf = [UInt8](repeating: 0, count: 65536)
+            let n = recv(fd, &buf, buf.count, 0)
+            guard n > 0 else { break }
+            rReader.append(Data(buf[0..<n]))
+            replyFrame = try rReader.next()
+        }
+        let reply = try XCTUnwrap(replyFrame)
+        XCTAssertEqual(reply.code, 41)
+
+        // Uploader can't reach us either → ConnectToPeer(F) → we dial them.
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: fTicket)
+        try uploader.accept()
+        let pierce = try uploader.readInitFrame()
+        XCTAssertEqual(pierce.code, 0)
+        // Uploader sends the ticket; we (downloader) reply with the offset.
+        var tBuf = MessageWriter()
+        tBuf.u32(fTicket)
+        try uploader.send(Data(tBuf.bytes))
+        var offBuf = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &offBuf, 8, 0), 8)
+        XCTAssertEqual(Data(offBuf), Data(count: 8)) // offset 0
+        try uploader.send(payload)
+
+        let done = await waitForTransfer(engine, timeout: 10) { $0.state == .completed }
+        let states = await engine.transfers.map { "\($0.state)" }
+        XCTAssertTrue(done, "indirect P+F download not completed: \(states)")
+        let first = await engine.transfers.first
+        let t = try XCTUnwrap(first)
+        let path = try XCTUnwrap(t.localPath)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), payload)
+    }
+
+    // MARK: - Raw socket helpers
+
+    private func dialListener(port: UInt16) throws -> Int32 {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw FakeServer.Failure.socket("socket") }
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        let r = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard r == 0 else { Darwin.close(fd); throw FakeServer.Failure.socket("connect") }
+        var tv = timeval(tv_sec: 15, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        return fd
+    }
+
+    private func sendAll(_ fd: Int32, _ data: Data) throws {
+        var sent = 0
+        while sent < data.count {
+            let n = data.withUnsafeBytes { ptr in
+                Darwin.send(fd, ptr.baseAddress!.advanced(by: sent), data.count - sent, 0)
+            }
+            guard n > 0 else { throw FakeServer.Failure.socket("send") }
+            sent += n
+        }
+    }
 }

@@ -71,15 +71,16 @@ public actor UploadEngine {
 
     /// Inbound F connection with PierceFw(ticket) — the downloader dialed us
     /// after our ConnectToPeer(F). We are the uploader on this connection.
-    public func handleIndirectUpload(_ link: PeerLink, ticket: UInt32, pending: Data) async {
+    /// Returns false when the ticket isn't ours (router tries the next engine).
+    public func handleIndirectUpload(_ link: PeerLink, ticket: UInt32, pending: Data) async -> Bool {
         guard let id = pendingF.removeValue(forKey: ticket), upload(id) != nil else {
-            link.connection.cancel()
-            return
+            return false
         }
         fWaitTasks[id]?.cancel()
         fWaitTasks[id] = nil
         fConns[id] = link
         await streamOut(id, conn: link.connection, pending: pending)
+        return true
     }
 
     public func cancel(_ id: UUID) async {

@@ -39,6 +39,8 @@ public actor TransferEngine {
     private var fConns: [UUID: NWConnection] = [:]
     private var runTasks: [UUID: Task<Void, Never>] = [:]
     private var fWaitTasks: [UUID: Task<Void, Never>] = [:]
+    private var pendingP: [UInt32: UUID] = [:]
+    private var pWaitTasks: [UUID: Task<Void, Never>] = [:]
     private var lastPublish: [UUID: Date] = [:]
 
     public init(server: ServerConnection, directory: URL) {
@@ -92,6 +94,51 @@ public actor TransferEngine {
         for id in Array(runTasks.keys) { teardownConns(id) }
     }
 
+    /// Direct P dial failed → ConnectToPeer(P) via the server; the uploader
+    /// dials our listener and sends PierceFw(ticket) → handleIndirectP.
+    private func requestIndirectP(_ id: UUID, username: String) async {
+        guard let t = transfer(id) else { return }
+        let ticket = UInt32.random(in: 1...UInt32.max)
+        pendingP[ticket] = id
+        update(id, force: true) { $0.state = .connecting }
+        var w = MessageWriter()
+        w.u32(ticket)
+        w.string(username)
+        w.string("P")
+        try? await server.send(frame: w.frame(code: 18))
+        pWaitTasks[id] = Task {
+            do {
+                try await Task.sleep(nanoseconds: 60_000_000_000)
+            } catch { return }
+            await self.pWaitTimedOut(id, ticket: ticket)
+        }
+    }
+
+    private func pWaitTimedOut(_ id: UUID, ticket: UInt32) async {
+        pendingP[ticket] = nil
+        guard let t = transfer(id), t.state == .connecting else { return }
+        fail(id, "user unreachable (both firewalled?)")
+    }
+
+    /// Inbound PierceFw on our listener matching a pending indirect-P request.
+    /// Returns false when the ticket isn't ours (router tries the next engine).
+    public func handleIndirectP(_ link: PeerLink, ticket: UInt32, pending: Data) async -> Bool {
+        guard let id = pendingP.removeValue(forKey: ticket), let t = transfer(id) else { return false }
+        pWaitTasks[id]?.cancel()
+        pWaitTasks[id] = nil
+        let conn = link.connection
+        pConns[id] = conn
+        do {
+            try await nwSend(conn, data: PeerMessages.queueDownload(filename: t.filename))
+        } catch {
+            fail(id, "queue send failed")
+            return true
+        }
+        update(id, force: true) { $0.state = .waiting(place: nil) }
+        await readPeerFrames(conn, id: id)
+        return true
+    }
+
     /// Direct F connection handed off from the shared listener (reachable networks).
     public func handleDirectFile(_ link: PeerLink, pending: Data) async {
         let conn = link.connection
@@ -130,7 +177,9 @@ public actor TransferEngine {
             pConns[id] = conn
             guard await nwWaitReady(conn) else {
                 conn.cancel()
-                fail(id, "cannot connect to user (firewalled?)")
+                pConns[id] = nil
+                // Firewalled uploader: ask the server to make them dial us.
+                await requestIndirectP(id, username: t.username)
                 return
             }
             let me = await server.username
@@ -335,6 +384,9 @@ public actor TransferEngine {
         runTasks[id] = nil
         fWaitTasks[id]?.cancel()
         fWaitTasks[id] = nil
+        pWaitTasks[id]?.cancel()
+        pWaitTasks[id] = nil
+        if let t = transfer(id) { pendingP = pendingP.filter { $0.value != id } }
         pConns[id]?.cancel()
         pConns[id] = nil
         fConns[id]?.cancel()

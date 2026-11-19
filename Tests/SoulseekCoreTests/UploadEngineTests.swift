@@ -72,7 +72,7 @@ final class UploadEngineTests: XCTestCase {
             onUploadRequest: { link, user, file, pending in
                 await uploads.handleQueueDownload(link, username: user, filename: file, pending: pending)
             },
-            onUploadConnection: { link, ticket, pending in
+            onPierce: { link, ticket, pending in
                 await uploads.handleIndirectUpload(link, ticket: ticket, pending: pending)
             })
         try await login(conn, server)
@@ -136,7 +136,7 @@ final class UploadEngineTests: XCTestCase {
             onUploadRequest: { link, user, file, pending in
                 await uploads.handleQueueDownload(link, username: user, filename: file, pending: pending)
             },
-            onUploadConnection: { link, ticket, pending in
+            onPierce: { link, ticket, pending in
                 await uploads.handleIndirectUpload(link, ticket: ticket, pending: pending)
             })
         try await login(conn, server)

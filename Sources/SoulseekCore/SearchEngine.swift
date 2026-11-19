@@ -31,18 +31,20 @@ public actor SearchEngine {
 
     private let onFileConnection: (@Sendable (PeerLink, Data) async -> Void)?
     private let onUploadRequest: (@Sendable (PeerLink, String, String, Data) async -> Void)?
-    private let onUploadConnection: (@Sendable (PeerLink, UInt32, Data) async -> Void)?
+    /// Inbound PierceFw: ticket-routed to whichever engine owns it
+    /// (indirect-P download response OR indirect-F upload). True = consumed.
+    private let onPierce: (@Sendable (PeerLink, UInt32, Data) async -> Bool)?
 
     public init(
         server: ServerConnection,
         onFileConnection: (@Sendable (PeerLink, Data) async -> Void)? = nil,
         onUploadRequest: (@Sendable (PeerLink, String, String, Data) async -> Void)? = nil,
-        onUploadConnection: (@Sendable (PeerLink, UInt32, Data) async -> Void)? = nil
+        onPierce: (@Sendable (PeerLink, UInt32, Data) async -> Bool)? = nil
     ) {
         self.server = server
         self.onFileConnection = onFileConnection
         self.onUploadRequest = onUploadRequest
-        self.onUploadConnection = onUploadConnection
+        self.onPierce = onPierce
         var continuation: AsyncStream<State>.Continuation?
         states = AsyncStream { continuation = $0 }
         stateContinuation = continuation!
@@ -207,10 +209,12 @@ public actor SearchEngine {
         guard let initFrame = parsed else { conn.cancel(); return }
         let pending = Data(initial.dropFirst(initFrame.consumed))
         if initFrame.code == 0 {
-            // PierceFw: a downloader dialing us for an indirect UPLOAD.
+            // PierceFw: ticket-routed (indirect-P download OR indirect-F upload).
             var tr = MessageReader(initFrame.payload)
             let ticket = (try? tr.u32()) ?? 0
-            await onUploadConnection?(PeerLink(conn), ticket, pending)
+            if await onPierce?(PeerLink(conn), ticket, pending) != true {
+                conn.cancel()
+            }
             return
         }
         guard initFrame.code == 1 else { conn.cancel(); return }
@@ -246,7 +250,9 @@ public actor SearchEngine {
             }
             var tr = MessageReader(buf.subdata(in: 5..<9))
             let ticket = (try? tr.u32()) ?? 0
-            await onUploadConnection?(PeerLink(conn), ticket, Data(buf.dropFirst(9)))
+            if await onPierce?(PeerLink(conn), ticket, Data(buf.dropFirst(9))) != true {
+                conn.cancel()
+            }
         } else {
             await onFileConnection?(PeerLink(conn), buf)
         }
