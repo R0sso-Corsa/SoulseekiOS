@@ -31,6 +31,13 @@ public struct FrameReader {
         buffer.append(contentsOf: data)
     }
 
+    /// Consume and return all buffered bytes (handoff to another protocol phase).
+    public mutating func rest() -> Data {
+        let out = Data(buffer)
+        buffer.removeAll()
+        return out
+    }
+
     /// Next complete frame, or nil when more bytes are needed.
     public mutating func next() throws -> Frame? {
         guard buffer.count >= 8 else { return nil }
