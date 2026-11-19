@@ -136,7 +136,8 @@ public actor SearchEngine {
     // MARK: - Server events
 
     private func consumeEvents() async {
-        for await event in server.events {
+        let stream = await server.makeEventStream()
+        for await event in stream {
             if Task.isCancelled { return }
             switch event {
             case .connectToPeer(let request):
@@ -148,6 +149,8 @@ public actor SearchEngine {
                 }
             case .cannotConnect:
                 break // we don't initiate indirect requests yet (transfer slice)
+            default:
+                break // chat/room events belong to ChatEngine
             }
         }
     }

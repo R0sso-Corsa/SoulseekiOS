@@ -17,6 +17,13 @@ public actor ServerConnection {
     public enum ServerEvent: Sendable {
         case connectToPeer(ConnectToPeerRequest)
         case cannotConnect(ticket: UInt32)
+        case privateMessage(PrivateMessage)
+        case roomMessage(RoomMessage)
+        case roomJoined(RoomJoined)
+        case roomLeft(room: String)
+        case userJoinedRoom(UserJoinedRoom)
+        case userLeftRoom(UserLeftRoom)
+        case roomList(RoomList)
     }
 
     public enum ConnectionError: Error, LocalizedError {
@@ -33,11 +40,12 @@ public actor ServerConnection {
     public private(set) var state: State = .disconnected
     public private(set) var username = ""
     public nonisolated let states: AsyncStream<State>
-    public nonisolated let events: AsyncStream<ServerEvent>
     public nonisolated let fileEvents: AsyncStream<ConnectToPeerRequest>
     private let stateContinuation: AsyncStream<State>.Continuation
-    private let eventContinuation: AsyncStream<ServerEvent>.Continuation
     private let fileEventContinuation: AsyncStream<ConnectToPeerRequest>.Continuation
+    /// Multicast event hub: SearchEngine, ChatEngine, … each get their own
+    /// stream (a single AsyncStream would split events between consumers).
+    private var eventStreams: [UUID: AsyncStream<ServerEvent>.Continuation] = [:]
 
     private var connection: NWConnection?
     private var reader = FrameReader()
@@ -52,9 +60,6 @@ public actor ServerConnection {
         var continuation: AsyncStream<State>.Continuation?
         states = AsyncStream { continuation = $0 }
         stateContinuation = continuation!
-        var eventCont: AsyncStream<ServerEvent>.Continuation?
-        events = AsyncStream { eventCont = $0 }
-        eventContinuation = eventCont!
         var fileCont: AsyncStream<ConnectToPeerRequest>.Continuation?
         fileEvents = AsyncStream { fileCont = $0 }
         fileEventContinuation = fileCont!
@@ -62,8 +67,27 @@ public actor ServerConnection {
 
     deinit {
         stateContinuation.finish()
-        eventContinuation.finish()
+        for cont in eventStreams.values { cont.finish() }
         fileEventContinuation.finish()
+    }
+
+    /// Subscribe to server events. Each caller receives EVERY event.
+    public func makeEventStream() -> AsyncStream<ServerEvent> {
+        let id = UUID()
+        return AsyncStream { cont in
+            self.eventStreams[id] = cont
+            cont.onTermination = { _ in
+                Task { await self.dropEventStream(id) }
+            }
+        }
+    }
+
+    private func dropEventStream(_ id: UUID) {
+        eventStreams[id] = nil
+    }
+
+    private func broadcast(_ event: ServerEvent) {
+        for cont in eventStreams.values { cont.yield(event) }
     }
 
     /// Connect and log in. Returns once the login response (or a failure) is
@@ -319,13 +343,42 @@ public actor ServerConnection {
                 if request.type == "F" {
                     fileEventContinuation.yield(request)
                 } else {
-                    eventContinuation.yield(.connectToPeer(request))
+                    broadcast(.connectToPeer(request))
                 }
             }
         case 1001: // CannotConnect
             var r = MessageReader(frame.payload)
             if let ticket = try? r.u32() {
-                eventContinuation.yield(.cannotConnect(ticket: ticket))
+                broadcast(.cannotConnect(ticket: ticket))
+            }
+        case 22: // PrivateMessage
+            if let pm = try? PrivateMessage(payload: frame.payload) {
+                broadcast(.privateMessage(pm))
+            }
+        case 13: // SayChatroom
+            if let rm = try? RoomMessage(payload: frame.payload) {
+                broadcast(.roomMessage(rm))
+            }
+        case 14: // JoinRoom reply
+            if let rj = try? RoomJoined(payload: frame.payload) {
+                broadcast(.roomJoined(rj))
+            }
+        case 15: // LeaveRoom reply
+            var r = MessageReader(frame.payload)
+            if let room = try? r.string() {
+                broadcast(.roomLeft(room: room))
+            }
+        case 16: // UserJoinedRoom
+            if let uj = try? UserJoinedRoom(payload: frame.payload) {
+                broadcast(.userJoinedRoom(uj))
+            }
+        case 17: // UserLeftRoom
+            if let ul = try? UserLeftRoom(payload: frame.payload) {
+                broadcast(.userLeftRoom(ul))
+            }
+        case 64: // RoomList (post-login burst + on request)
+            if let list = try? RoomList(payload: frame.payload) {
+                broadcast(.roomList(list))
             }
         default:
             break // post-login burst (RoomList, PrivilegedUsers, …) — later slices consume these
