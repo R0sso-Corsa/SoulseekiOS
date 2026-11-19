@@ -7,6 +7,15 @@ options:
 packages:
   SoulseekiOS:
     path: .
+schemes:
+  SoulseekiOS:
+    build:
+      targets:
+        SoulseekiOS: all
+    run:
+      config: Debug
+    archive:
+      config: Release
 targets:
   SoulseekiOS:
     type: application
