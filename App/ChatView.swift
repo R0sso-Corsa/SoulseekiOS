@@ -415,6 +415,22 @@ struct RoomBrowserSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                let myRooms = model.conversations.filter { $0.kind == .room }
+                if !myRooms.isEmpty {
+                    Section("Your groups") {
+                        ForEach(myRooms) { conv in
+                            Button { onJoin(conv.name) } label: {
+                                HStack {
+                                    Text(conv.name)
+                                    Spacer()
+                                    Text("\(conv.members.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityIdentifier("myGroupRow")
+                        }
+                    }
+                }
                 if let list = model.roomList {
                     Section("Public groups") {
                         ForEach(list.publicRooms.sorted { $0.userCount > $1.userCount }, id: \.name) { room in
@@ -444,6 +460,11 @@ struct RoomBrowserSheet: View {
                     }
                 } else {
                     ProgressView("Loading groups…")
+                }
+                Section {
+                    Text("The server only lists groups with 5+ members. New groups are invisible here until people join — invite friends by sending them the name (+ → New message).")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Groups")

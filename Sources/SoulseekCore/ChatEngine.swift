@@ -113,6 +113,8 @@ public actor ChatEngine {
     }
 
     public func requestRoomList() async {
+        // Clear the cache so waiters block until the FRESH response arrives.
+        roomList = nil
         try? await server.send(frame: ServerMessages.roomList())
     }
 
