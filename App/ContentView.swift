@@ -4,18 +4,27 @@ struct ContentView: View {
     @State private var model = AppModel()
 
     var body: some View {
-        NavigationStack {
-            switch model.phase {
-            case .connected(let greeting, let publicIP, let privileged):
-                ConnectedView(
-                    greeting: greeting,
-                    publicIP: publicIP,
-                    privileged: privileged,
-                    username: model.username,
-                    onDisconnect: model.disconnect,
-                    onSignOut: model.signOut
-                )
-            default:
+        switch model.phase {
+        case .connected(let greeting, let publicIP, let privileged):
+            TabView {
+                NavigationStack {
+                    SearchView(model: model.searchModel)
+                }
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                NavigationStack {
+                    ConnectedView(
+                        greeting: greeting,
+                        publicIP: publicIP,
+                        privileged: privileged,
+                        username: model.username,
+                        onDisconnect: model.disconnect,
+                        onSignOut: model.signOut
+                    )
+                }
+                .tabItem { Label("Status", systemImage: "person.crop.circle") }
+            }
+        default:
+            NavigationStack {
                 LoginView(model: model)
             }
         }

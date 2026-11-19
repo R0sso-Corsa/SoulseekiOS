@@ -1,8 +1,9 @@
 import Foundation
 import SoulseekCore
 
-/// App-level state for the login slice. Bridges the ServerConnection actor's
-/// state stream into SwiftUI observation; credentials live in the Keychain.
+/// App-level state. Bridges the ServerConnection actor's state stream into
+/// SwiftUI observation; credentials live in the Keychain. Owns the search
+/// engine and starts/stops its listener with the connection lifecycle.
 @MainActor
 @Observable
 final class AppModel {
@@ -19,11 +20,15 @@ final class AppModel {
     var password: String = ""
     var keychainError: String?
 
+    let searchEngine: SearchEngine
+    let searchModel: SearchModel
     private let connection = ServerConnection()
     private let keychain = KeychainStore()
     private var stateTask: Task<Void, Never>?
 
     init() {
+        searchEngine = SearchEngine(server: connection)
+        searchModel = SearchModel(engine: searchEngine)
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }
@@ -69,14 +74,18 @@ final class AppModel {
         switch state {
         case .disconnected:
             phase = .loggedOut
+            Task { await searchEngine.stopListening() }
         case .connecting:
             phase = .connecting
         case .connected(let greeting, let publicIP, let privileged):
             phase = .connected(greeting: greeting, publicIP: publicIP, privileged: privileged)
+            Task { await searchEngine.startListening() }
         case .failed(let reason):
             phase = .failed(reason)
+            Task { await searchEngine.stopListening() }
         case .kicked:
             phase = .kicked
+            Task { await searchEngine.stopListening() }
         }
     }
 }

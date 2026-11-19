@@ -45,8 +45,17 @@ final class LoginUITests: XCTestCase {
         password.typeText(pass)
         app.buttons["connectButton"].tap()
 
+        // Connected state is a TabView; check the Status tab for details.
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 30), "login did not reach Connected")
+        let statusTab = app.tabBars.buttons["Status"]
+        XCTAssertTrue(statusTab.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 0.5) // let the tab transition settle
+        statusTab.tap()
         let connected = app.staticTexts["connectedLabel"]
-        XCTAssertTrue(connected.waitForExistence(timeout: 30), "login did not reach Connected")
+        if !connected.waitForExistence(timeout: 3) {
+            statusTab.tap() // retry once if the first tap landed mid-transition
+        }
+        XCTAssertTrue(connected.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["publicIPValue"].exists)
 
         let screenshot = XCUIScreen.main.screenshot()

@@ -14,6 +14,8 @@ public actor SearchEngine {
         public var replies: [SearchReply] = []
         public var finished = false
         public var listenPort: UInt16 = 0
+
+        public init() {}
     }
 
     public private(set) var state = State()
