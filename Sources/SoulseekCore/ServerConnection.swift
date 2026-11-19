@@ -19,20 +19,23 @@ public actor ServerConnection {
         case cannotConnect(ticket: UInt32)
     }
 
-    public enum ConnectionError: Error { case notConnected }
+    public enum ConnectionError: Error { case notConnected, addressTimeout }
 
     public private(set) var state: State = .disconnected
+    public private(set) var username = ""
     public nonisolated let states: AsyncStream<State>
     public nonisolated let events: AsyncStream<ServerEvent>
+    public nonisolated let fileEvents: AsyncStream<ConnectToPeerRequest>
     private let stateContinuation: AsyncStream<State>.Continuation
     private let eventContinuation: AsyncStream<ServerEvent>.Continuation
+    private let fileEventContinuation: AsyncStream<ConnectToPeerRequest>.Continuation
 
     private var connection: NWConnection?
     private var reader = FrameReader()
     private var receiveTask: Task<Void, Never>?
     private var pingTask: Task<Void, Never>?
     private var loginContinuation: CheckedContinuation<Void, Never>?
-    private var username = ""
+    private var addressRequests: [String: CheckedContinuation<PeerAddressReply, Error>] = [:]
 
     public init() {
         var continuation: AsyncStream<State>.Continuation?
@@ -41,11 +44,15 @@ public actor ServerConnection {
         var eventCont: AsyncStream<ServerEvent>.Continuation?
         events = AsyncStream { eventCont = $0 }
         eventContinuation = eventCont!
+        var fileCont: AsyncStream<ConnectToPeerRequest>.Continuation?
+        fileEvents = AsyncStream { fileCont = $0 }
+        fileEventContinuation = fileCont!
     }
 
     deinit {
         stateContinuation.finish()
         eventContinuation.finish()
+        fileEventContinuation.finish()
     }
 
     /// Connect and log in. Returns once the login response (or a failure) is
@@ -103,6 +110,24 @@ public actor ServerConnection {
     /// Send a raw frame to the server (SearchEngine and later slices).
     public func send(frame: Data) async throws {
         try await send(frame)
+    }
+
+    /// Resolve a peer's address via GetPeerAddress(3); 10s timeout.
+    public func peerAddress(for username: String) async throws -> PeerAddressReply {
+        try await send(ServerMessages.getPeerAddress(username: username))
+        return try await withCheckedThrowingContinuation { cont in
+            addressRequests[username] = cont
+            Task {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                await self.timeoutAddressRequest(username)
+            }
+        }
+    }
+
+    private func timeoutAddressRequest(_ username: String) async {
+        if let cont = addressRequests.removeValue(forKey: username) {
+            cont.resume(throwing: ConnectionError.addressTimeout)
+        }
     }
 
     // MARK: - Internals
@@ -207,9 +232,18 @@ public actor ServerConnection {
             setState(.kicked)
             await tearDown(keepState: true)
             resumeLogin()
-        case 18: // ConnectToPeer: a peer wants an indirect connection
+        case 3: // GetPeerAddress reply
+            if let reply = try? PeerAddressReply(payload: frame.payload),
+               let cont = addressRequests.removeValue(forKey: reply.username) {
+                cont.resume(returning: reply)
+            }
+        case 18: // ConnectToPeer: indirect connection request; route by type
             if let request = try? ConnectToPeerRequest(payload: frame.payload) {
-                eventContinuation.yield(.connectToPeer(request))
+                if request.type == "F" {
+                    fileEventContinuation.yield(request)
+                } else {
+                    eventContinuation.yield(.connectToPeer(request))
+                }
             }
         case 1001: // CannotConnect
             var r = MessageReader(frame.payload)
@@ -224,8 +258,9 @@ public actor ServerConnection {
     private func startPing() {
         pingTask = Task {
             while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
+                if Task.isCancelled { return }
                 do {
-                    try await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
                     try await self.send(ServerMessages.ping())
                 } catch {
                     return

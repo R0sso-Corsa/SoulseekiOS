@@ -29,8 +29,11 @@ public actor SearchEngine {
     private var peerTasks: [UUID: Task<Void, Never>] = [:]
     private var peerConns: [UUID: NWConnection] = [:]
 
-    public init(server: ServerConnection) {
+    private let onFileConnection: ((NWConnection, Data) async -> Void)?
+
+    public init(server: ServerConnection, onFileConnection: ((NWConnection, Data) async -> Void)? = nil) {
         self.server = server
+        self.onFileConnection = onFileConnection
         var continuation: AsyncStream<State>.Continuation?
         states = AsyncStream { continuation = $0 }
         stateContinuation = continuation!
@@ -188,11 +191,17 @@ public actor SearchEngine {
         }
         guard let initFrame = parsed, initFrame.code == 1 else { conn.cancel(); return }
         var r = MessageReader(initFrame.payload)
-        guard (try? r.string()) != nil, let type = try? r.string(), type == "P" else {
+        guard (try? r.string()) != nil, let type = try? r.string() else {
             conn.cancel()
             return
         }
-        await readPeerFrames(conn, pending: initial.dropFirst(initFrame.consumed))
+        let pending = Data(initial.dropFirst(initFrame.consumed))
+        if type == "F" {
+            await onFileConnection?(conn, pending)
+            return
+        }
+        guard type == "P" else { conn.cancel(); return }
+        await readPeerFrames(conn, pending: pending)
         conn.cancel()
     }
 
