@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Network
 import SoulseekCore
 import SoulseekProtocol
 
@@ -23,6 +24,24 @@ final class AppModel {
     var keychainError: String?
     /// Survives reconnects — a transient drop must not reset the user's tab.
     var selectedTab = 0
+
+    // MARK: - Settings (persisted)
+
+    var wiFiOnlyDownloads = UserDefaults.standard.bool(forKey: "slsk.wiFiOnly") {
+        didSet {
+            UserDefaults.standard.set(wiFiOnlyDownloads, forKey: "slsk.wiFiOnly")
+            applyNetworkPolicy()
+        }
+    }
+    var downloadLimitKBs: UInt64 = UInt64(max(0, UserDefaults.standard.integer(forKey: "slsk.downLimit"))) {
+        didSet {
+            UserDefaults.standard.set(Int(downloadLimitKBs), forKey: "slsk.downLimit")
+            Task { await transferEngine.setSpeedLimit(kbps: downloadLimitKBs) }
+        }
+    }
+    private let pathMonitor = NWPathMonitor()
+    private var onCellular = false
+    private var policyPaused = false
 
     let searchEngine: SearchEngine
     let searchModel: SearchModel
@@ -91,6 +110,12 @@ final class AppModel {
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
         }
+        if CommandLine.arguments.contains("-UITestResetSettings") {
+            UserDefaults.standard.removeObject(forKey: "slsk.wiFiOnly")
+            UserDefaults.standard.removeObject(forKey: "slsk.downLimit")
+            wiFiOnlyDownloads = false
+            downloadLimitKBs = 0
+        }
         if CommandLine.arguments.contains("-UITestSeedShare") {
             let seed = FileManager.default.temporaryDirectory.appendingPathComponent("SeedShare")
             try? FileManager.default.createDirectory(at: seed, withIntermediateDirectories: true)
@@ -113,6 +138,29 @@ final class AppModel {
         if !username.isEmpty, !password.isEmpty,
            !CommandLine.arguments.contains("-UITestResetCredentials") {
             connect()
+        }
+        Task { await transferEngine.setSpeedLimit(kbps: downloadLimitKBs) }
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            let cellular = path.usesInterfaceType(.cellular)
+            Task { @MainActor in
+                self?.onCellular = cellular
+                self?.applyNetworkPolicy()
+            }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "slsk.pathmonitor"))
+    }
+
+    /// Wi-Fi-only policy: pause downloads on cellular, resume when Wi-Fi
+    /// returns (or the toggle is turned off).
+    private func applyNetworkPolicy() {
+        if wiFiOnlyDownloads && onCellular {
+            if !policyPaused {
+                policyPaused = true
+                Task { await transferEngine.pauseAll() }
+            }
+        } else if policyPaused {
+            policyPaused = false
+            Task { await transferEngine.resumeAll() }
         }
     }
 
@@ -227,7 +275,10 @@ final class AppModel {
     /// Foregrounded: resume anything paused while away.
     func sceneForegrounded() {
         endBackgroundTask()
-        Task { await transferEngine.resumeAll() }
+        Task {
+            await transferEngine.resumeAll()
+            applyNetworkPolicy()
+        }
     }
 
     private func endBackgroundTask() {

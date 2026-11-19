@@ -6,6 +6,7 @@ struct SearchView: View {
     var appModel: AppModel? = nil
     @State private var selectedUser: String?
     @State private var showWishlist = false
+    @State private var showSettings = false
     @State private var showCustomBitrate = false
     @State private var customBitrateText = ""
 
@@ -201,7 +202,16 @@ struct SearchView: View {
                         Image(systemName: "list.bullet")
                     }
                     .accessibilityIdentifier("wishlistButton")
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityIdentifier("settingsButton")
                 }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            if let appModel {
+                SettingsSheet(appModel: appModel)
             }
         }
         .sheet(isPresented: $showWishlist) {

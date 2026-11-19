@@ -237,6 +237,51 @@ final class TransferEngineTests: XCTestCase {
         XCTAssertTrue(failed, "stuck after pause/resume of indirect-P: \(ts)")
     }
 
+    /// Throttle: a 256KB file at 128KB/s must take ~2s, not finish instantly.
+    func testDownloadSpeedLimit() async throws {
+        let server = try FakeServer()
+        let uploader = try FakeServer()
+        defer { server.close(); uploader.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+        await engine.setSpeedLimit(kbps: 128)
+
+        let file = "@@music\\Test\\big.mp3"
+        let payload = Data((0..<262_144).map { UInt8($0 % 251) })
+        let start = Date()
+        await engine.download(username: "uploader", filename: file, size: UInt64(payload.count))
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        _ = try uploader.readFrame()
+        var treq = MessageWriter()
+        treq.u32(1); treq.u32(55); treq.string(file); treq.u64(UInt64(payload.count))
+        try uploader.send(treq.frame(code: 40))
+        _ = try uploader.readFrame()
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 99)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        try uploader.send(Data([55, 0, 0, 0]))
+        var offsetBuf = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &offsetBuf, 8, 0), 8)
+        try uploader.send(payload)
+
+        let done = await waitForTransfer(engine, timeout: 15) { $0.state == .completed }
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertTrue(done, "throttled download did not complete")
+        XCTAssertGreaterThanOrEqual(elapsed, 1.5, "limit not enforced: finished in \(elapsed)s")
+        let ts = await engine.transfers
+        let t = try XCTUnwrap(ts.first)
+        let path = try XCTUnwrap(t.localPath)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), payload)
+    }
+
     /// Resume: a .partial file exists; the offset sent must equal its size and
     /// only the remaining bytes are transferred.
     func testDownloadResumesFromPartial() async throws {

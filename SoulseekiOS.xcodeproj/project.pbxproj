@@ -19,10 +19,12 @@
 		306230C656C371EFD44169FB /* WishlistSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07284A0AF7DF221236AC2CE /* WishlistSheet.swift */; };
 		32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */; };
 		32EF6437B534850DF69213E1 /* BrowseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D3FB62AF6734D7AFF7EBA5 /* BrowseUITests.swift */; };
+		4249A264F2DADED9C2492D7C /* SettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C40093DF42E61DC0A41C86 /* SettingsUITests.swift */; };
 		49A0963DEC7F58D4762A2165 /* WishlistUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42345204484841821C430142 /* WishlistUITests.swift */; };
 		4BEED639ADEB8E26647ACF28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FA896C59EBF67275ACDD076 /* Assets.xcassets */; };
 		5299C9CFCF76A560EEB3B051 /* TickerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D87DD72B7517AA630A61C9B /* TickerUITests.swift */; };
 		54BDC3DDA89C008953237F30 /* BuddyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C0F3BF6B4AA2434A98B0A20 /* BuddyModel.swift */; };
+		577EC5974FAFA331F92AAA58 /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4E3B3B004C09BDA8CE7363 /* SettingsSheet.swift */; };
 		5997FB79AEA0A955AF53B69F /* WishlistModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */; };
 		693288E4FD7FED07F549CFAE /* ScopedSearchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D2FE29624D7D48E823832E /* ScopedSearchUITests.swift */; };
 		8137581503554A3002E800D0 /* AutoLoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9662B329026A532D2B4F039 /* AutoLoginUITests.swift */; };
@@ -67,6 +69,7 @@
 		517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginUITests.swift; sourceTree = "<group>"; };
 		5D771E7F90F60B1F8D953E13 /* SearchModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchModel.swift; sourceTree = "<group>"; };
 		673FEB1E5C96C4B32B39A914 /* SoulseekiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SoulseekiOS.entitlements; sourceTree = "<group>"; };
+		68C40093DF42E61DC0A41C86 /* SettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsUITests.swift; sourceTree = "<group>"; };
 		6CAC8752410A23D728351862 /* TransfersModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersModel.swift; sourceTree = "<group>"; };
 		73FC99A775B3A411B6ACAB7F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		746AE3CD092D480A79485EBA /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
@@ -92,6 +95,7 @@
 		E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulseekiOSApp.swift; sourceTree = "<group>"; };
 		F41AA9BE35D4320C5763AE59 /* SoulseekiOS */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SoulseekiOS; path = .; sourceTree = SOURCE_ROOT; };
 		F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatUITests.swift; sourceTree = "<group>"; };
+		FA4E3B3B004C09BDA8CE7363 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		FE56415029EAA10FDE2624FA /* ChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -120,6 +124,7 @@
 				517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */,
 				A2D2FE29624D7D48E823832E /* ScopedSearchUITests.swift */,
 				13134CEA7098BB2250077288 /* SearchUITests.swift */,
+				68C40093DF42E61DC0A41C86 /* SettingsUITests.swift */,
 				05522D9B8D0527B291356AF9 /* SharingUITests.swift */,
 				746AE3CD092D480A79485EBA /* TestHelpers.swift */,
 				8D87DD72B7517AA630A61C9B /* TickerUITests.swift */,
@@ -171,6 +176,7 @@
 				7ACC65140334C67989CF2407 /* LoginView.swift */,
 				5D771E7F90F60B1F8D953E13 /* SearchModel.swift */,
 				1D01518FCEE615528776464F /* SearchView.swift */,
+				FA4E3B3B004C09BDA8CE7363 /* SettingsSheet.swift */,
 				74AEC45162387E08A99FC02F /* SharingSheet.swift */,
 				673FEB1E5C96C4B32B39A914 /* SoulseekiOS.entitlements */,
 				E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */,
@@ -294,6 +300,7 @@
 				ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */,
 				13F8BB00A9BB3AEDD50CD7CE /* SearchModel.swift in Sources */,
 				B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */,
+				577EC5974FAFA331F92AAA58 /* SettingsSheet.swift in Sources */,
 				E83622A0F4DCB5B690E2F0BD /* SharingSheet.swift in Sources */,
 				32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */,
 				9C9F574B6D6EEA597207BF9B /* TransfersModel.swift in Sources */,
@@ -318,6 +325,7 @@
 				A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */,
 				693288E4FD7FED07F549CFAE /* ScopedSearchUITests.swift in Sources */,
 				2EC6376A7E3ABF52B2E9F4B6 /* SearchUITests.swift in Sources */,
+				4249A264F2DADED9C2492D7C /* SettingsUITests.swift in Sources */,
 				97E558B40293D032B57E062D /* SharingUITests.swift in Sources */,
 				BADEC50E4FFB1282F1CB6E3B /* TestHelpers.swift in Sources */,
 				5299C9CFCF76A560EEB3B051 /* TickerUITests.swift in Sources */,

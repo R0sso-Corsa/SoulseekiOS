@@ -44,6 +44,12 @@ public actor TransferEngine {
     private var pendingP: [UInt32: UUID] = [:]
     private var pWaitTasks: [UUID: Task<Void, Never>] = [:]
     private var lastPublish: [UUID: Date] = [:]
+    private var speedLimitKBs: UInt64 = 0
+
+    /// Download throttle in KB/s; 0 = unlimited.
+    public func setSpeedLimit(kbps: UInt64) {
+        speedLimitKBs = kbps
+    }
 
     public init(server: ServerConnection, directory: URL) {
         self.server = server
@@ -360,6 +366,8 @@ public actor TransferEngine {
 
         var received = offset
         var buffer = pending
+        var windowStart = Date()
+        var windowBytes: UInt64 = 0
         while received < t.size {
             if Task.isCancelled || transfer(id)?.state == .cancelled || transfer(id)?.state == .paused { conn.cancel(); return }
             if buffer.isEmpty {
@@ -383,6 +391,21 @@ public actor TransferEngine {
             received += UInt64(toWrite.count)
             buffer = Data(buffer.dropFirst(toWrite.count))
             update(id) { $0.received = received }
+            // Token-window throttle: sleep off any burst above the limit.
+            if speedLimitKBs > 0 {
+                windowBytes += UInt64(toWrite.count)
+                let elapsed = Date().timeIntervalSince(windowStart)
+                let rate = Double(speedLimitKBs * 1024)
+                let allowed = rate * elapsed
+                if Double(windowBytes) > allowed {
+                    let sleepS = (Double(windowBytes) - allowed) / rate
+                    try? await Task.sleep(nanoseconds: UInt64(sleepS * 1_000_000_000))
+                }
+                if elapsed >= 1 {
+                    windowStart = Date()
+                    windowBytes = 0
+                }
+            }
         }
 
         // Complete: the DOWNLOADER closes, then finalize the file.
