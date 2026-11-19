@@ -139,6 +139,73 @@ final class SearchEngineTests: XCTestCase {
         await conn.disconnect()
     }
 
+    /// Scoped searches send UserSearch(42)/RoomSearch(120); replies flow
+    /// through the same ticket-matched pipeline as global search.
+    func testUserAndRoomSearchScopes() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let responder = try FakeServer()
+        defer { responder.close() }
+
+        let conn = ServerConnection()
+        let engine = SearchEngine(server: conn)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+
+        async let connecting: Void = conn.connect(username: "tester", password: "pw", host: "127.0.0.1", port: server.port)
+        try server.accept()
+        _ = try server.readFrame()
+        try server.send(loginSuccessFrame(greeting: "", ip: [127, 0, 0, 1], privileged: false))
+        for _ in 0..<9 { _ = try server.readFrame() }
+        await connecting
+
+        // User scope → code 42: username, ticket, query.
+        await engine.search("flac", timeout: 5, scope: .user("alice"))
+        let userFrame = try server.readFrame()
+        XCTAssertEqual(userFrame.code, 42)
+        var ur = MessageReader(userFrame.payload)
+        XCTAssertEqual(try ur.string(), "alice")
+        let ticket = try ur.u32()
+        XCTAssertEqual(try ur.string(), "flac")
+
+        // Reply via the indirect path (same pipeline as global search).
+        var ctp = MessageWriter()
+        ctp.string("responder"); ctp.string("P")
+        ctp.u8(1); ctp.u8(0); ctp.u8(0); ctp.u8(127)
+        ctp.u32(UInt32(responder.port)); ctp.u32(ticket); ctp.u8(0)
+        ctp.u32(0); ctp.u32(0)
+        try server.send(ctp.frame(code: 18))
+        try responder.accept()
+        _ = try responder.readInitFrame()
+        var body = MessageWriter()
+        body.string("alice")
+        body.u32(ticket)
+        body.u32(1)
+        body.u8(1)
+        body.string("Music\\song.mp3")
+        body.u64(123)
+        body.string("mp3")
+        body.u32(0)
+        body.u8(1)
+        body.u32(1000)
+        body.u32(0)
+        body.u32(0)
+        body.u32(0)
+        try responder.send(frameBytes(code: 9, payload: Zlib.deflate(Data(body.bytes))))
+        let gotResult = await waitForState(engine) { !$0.replies.isEmpty }
+        XCTAssertTrue(gotResult, "scoped search reply did not arrive")
+        let state = await engine.state
+        XCTAssertEqual(state.replies[0].username, "alice")
+
+        // Room scope → code 120: room, ticket, query.
+        await engine.search("mp3", timeout: 2, scope: .room("jazz"))
+        let roomFrame = try server.readFrame()
+        XCTAssertEqual(roomFrame.code, 120)
+        var rr = MessageReader(roomFrame.payload)
+        XCTAssertEqual(try rr.string(), "jazz")
+        _ = try rr.u32()
+        XCTAssertEqual(try rr.string(), "mp3")
+    }
+
     func testSearchTimesOutWithNoResults() async throws {
         let server = try FakeServer()
         defer { server.close() }

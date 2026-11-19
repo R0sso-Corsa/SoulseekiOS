@@ -17,6 +17,7 @@ final class SearchModel {
     }
 
     var queryText = ""
+    var scope: SearchEngine.SearchScope = .global
     var minBitrate = 0 { didSet { scheduleRecompute() } }
     var minBitDepth = 0 { didSet { scheduleRecompute() } }
     var freeSlotsOnly = false { didSet { scheduleRecompute() } }
@@ -59,7 +60,26 @@ final class SearchModel {
     func search() {
         let q = queryText.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
-        Task { await engine.search(q) }
+        let scope = self.scope
+        Task { await engine.search(q, scope: scope) }
+    }
+
+    /// Scoped search from the user sheet / room view; "*" lists everything
+    /// the target shares when no query is given.
+    func searchInUser(_ username: String, query: String = "*") {
+        scope = .user(username)
+        queryText = query
+        search()
+    }
+
+    func searchInRoom(_ room: String, query: String = "*") {
+        scope = .room(room)
+        queryText = query
+        search()
+    }
+
+    func clearScope() {
+        scope = .global
     }
 
     func stop() {

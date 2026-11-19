@@ -82,6 +82,25 @@ public enum ServerMessages {
         return w.frame(code: 26)
     }
 
+    /// Code 42. Search one user's shares; replies arrive as normal
+    /// PeerSearchReply(9) with the same ticket.
+    public static func userSearch(username: String, ticket: UInt32, query: String) -> Data {
+        var w = MessageWriter()
+        w.string(username)
+        w.u32(ticket)
+        w.string(query)
+        return w.frame(code: 42)
+    }
+
+    /// Code 120. Search shares of users in a chat room.
+    public static func roomSearch(room: String, ticket: UInt32, query: String) -> Data {
+        var w = MessageWriter()
+        w.string(room)
+        w.u32(ticket)
+        w.string(query)
+        return w.frame(code: 120)
+    }
+
     /// Code 1001. Report a failed indirect connection attempt back to the server.
     public static func cannotConnect(ticket: UInt32, username: String) -> Data {
         var w = MessageWriter()

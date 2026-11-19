@@ -46,6 +46,15 @@ struct UserView: View {
                     }
                     Section("Shares") {
                         Button {
+                            let q = appModel.searchModel.queryText.trimmingCharacters(in: .whitespaces)
+                            appModel.searchModel.searchInUser(username, query: q.isEmpty ? "*" : q)
+                            appModel.selectedTab = 0
+                            dismiss()
+                        } label: {
+                            Label("Search this user", systemImage: "magnifyingglass")
+                        }
+                        .accessibilityIdentifier("searchUserButton")
+                        Button {
                             Task { await loadBrowse() }
                         } label: {
                             Label(browsing ? "Browsing…" : "Browse shares", systemImage: "folder")

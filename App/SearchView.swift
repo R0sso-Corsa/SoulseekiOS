@@ -47,6 +47,23 @@ struct SearchView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     GlassEffectContainer(spacing: 6) {
                         HStack(spacing: 6) {
+                        if model.scope != .global {
+                            Button { model.clearScope() } label: {
+                                GlassChipLabel(
+                                    title: {
+                                        switch model.scope {
+                                        case .user(let u): return "User: \(u)"
+                                        case .room(let r): return "Room: \(r)"
+                                        case .global: return ""
+                                        }
+                                    }(),
+                                    systemImage: "xmark.circle.fill",
+                                    selected: true
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("scopeChip")
+                        }
                         Menu {
                             Picker("Min bitrate", selection: $model.minBitrate) {
                                 Text("Any bitrate").tag(0)

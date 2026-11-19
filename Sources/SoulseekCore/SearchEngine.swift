@@ -98,7 +98,15 @@ public actor SearchEngine {
 
     // MARK: - Searching
 
-    public func search(_ query: String, timeout: TimeInterval = 20, wishlist: Bool = false) async {
+    /// Where a search is directed: the whole network, one user's shares
+    /// (UserSearch 42), or a chat room's members (RoomSearch 120).
+    public enum SearchScope: Equatable, Sendable {
+        case global
+        case user(String)
+        case room(String)
+    }
+
+    public func search(_ query: String, timeout: TimeInterval = 20, wishlist: Bool = false, scope: SearchScope = .global) async {
         timeoutTask?.cancel()
         let ticket = UInt32.random(in: 1...UInt32.max)
         state.query = query
@@ -107,10 +115,21 @@ public actor SearchEngine {
         state.replies = []
         state.finished = false
         publish()
+        let frame: Data
+        if wishlist {
+            frame = ServerMessages.wishlistSearch(ticket: ticket, query: query)
+        } else {
+            switch scope {
+            case .global:
+                frame = ServerMessages.fileSearch(ticket: ticket, query: query)
+            case .user(let username):
+                frame = ServerMessages.userSearch(username: username, ticket: ticket, query: query)
+            case .room(let room):
+                frame = ServerMessages.roomSearch(room: room, ticket: ticket, query: query)
+            }
+        }
         do {
-            try await server.send(frame: wishlist
-                ? ServerMessages.wishlistSearch(ticket: ticket, query: query)
-                : ServerMessages.fileSearch(ticket: ticket, query: query))
+            try await server.send(frame: frame)
         } catch {
             state.isSearching = false
             state.finished = true

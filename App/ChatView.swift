@@ -171,6 +171,14 @@ struct ConversationView: View {
         .toolbar {
             if isRoom {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button("Search room") {
+                        let q = appModel.searchModel.queryText.trimmingCharacters(in: .whitespaces)
+                        appModel.searchModel.searchInRoom(name, query: q.isEmpty ? "*" : q)
+                        appModel.selectedTab = 0
+                    }
+                    .accessibilityIdentifier("searchRoomButton")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Leave") {
                         chatModel.leaveRoom(name)
                         dismiss()
