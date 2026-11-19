@@ -30,10 +30,19 @@ public actor SearchEngine {
     private var peerConns: [UUID: NWConnection] = [:]
 
     private let onFileConnection: (@Sendable (PeerLink, Data) async -> Void)?
+    private let onUploadRequest: (@Sendable (PeerLink, String, String, Data) async -> Void)?
+    private let onUploadConnection: (@Sendable (PeerLink, UInt32, Data) async -> Void)?
 
-    public init(server: ServerConnection, onFileConnection: (@Sendable (PeerLink, Data) async -> Void)? = nil) {
+    public init(
+        server: ServerConnection,
+        onFileConnection: (@Sendable (PeerLink, Data) async -> Void)? = nil,
+        onUploadRequest: (@Sendable (PeerLink, String, String, Data) async -> Void)? = nil,
+        onUploadConnection: (@Sendable (PeerLink, UInt32, Data) async -> Void)? = nil
+    ) {
         self.server = server
         self.onFileConnection = onFileConnection
+        self.onUploadRequest = onUploadRequest
+        self.onUploadConnection = onUploadConnection
         var continuation: AsyncStream<State>.Continuation?
         states = AsyncStream { continuation = $0 }
         stateContinuation = continuation!
@@ -178,7 +187,8 @@ public actor SearchEngine {
         }
         do {
             try await send(on: conn, data: PeerInitMessages.pierceFirewall(ticket: request.ticket))
-            await readPeerFrames(conn)
+            let handedOff = await readPeerFrames(conn, username: request.username)
+            if handedOff { return } // upload engine owns the connection now
         } catch {
             await reportCannotConnect(request)
         }
@@ -194,32 +204,75 @@ public actor SearchEngine {
             initial.append(chunk)
             parsed = try? PeerInitMessages.parseInitFrame(initial)
         }
-        guard let initFrame = parsed, initFrame.code == 1 else { conn.cancel(); return }
+        guard let initFrame = parsed else { conn.cancel(); return }
+        let pending = Data(initial.dropFirst(initFrame.consumed))
+        if initFrame.code == 0 {
+            // PierceFw: a downloader dialing us for an indirect UPLOAD.
+            var tr = MessageReader(initFrame.payload)
+            let ticket = (try? tr.u32()) ?? 0
+            await onUploadConnection?(PeerLink(conn), ticket, pending)
+            return
+        }
+        guard initFrame.code == 1 else { conn.cancel(); return }
         var r = MessageReader(initFrame.payload)
-        guard (try? r.string()) != nil, let type = try? r.string() else {
+        guard let username = try? r.string(), let type = try? r.string() else {
             conn.cancel()
             return
         }
-        let pending = Data(initial.dropFirst(initFrame.consumed))
         if type == "F" {
-            await onFileConnection?(PeerLink(conn), pending)
+            await routeFileConnection(conn, pending: pending)
             return
         }
         guard type == "P" else { conn.cancel(); return }
-        await readPeerFrames(conn, pending: pending)
-        conn.cancel()
+        let handedOff = await readPeerFrames(conn, pending: pending, username: username)
+        if !handedOff { conn.cancel() }
     }
 
-    private func readPeerFrames(_ conn: NWConnection, pending: Data = Data()) async {
+    /// Inbound F: distinguish uploader→us (raw ticket first, a DOWNLOAD) from
+    /// downloader→us (PierceFw frame first, an UPLOAD). PierceFw starts with
+    /// length=5, code=0; a raw ticket equal to 5 with a zero offset byte is a
+    /// ~2^-40 collision, accepted and documented.
+    private func routeFileConnection(_ conn: NWConnection, pending: Data) async {
+        var buf = pending
+        while buf.count < 5 {
+            guard let chunk = await receiveChunk(conn) else { conn.cancel(); return }
+            buf.append(chunk)
+        }
+        let isPierce = buf[0] == 5 && buf[1] == 0 && buf[2] == 0 && buf[3] == 0 && buf[4] == 0
+        if isPierce {
+            while buf.count < 9 {
+                guard let chunk = await receiveChunk(conn) else { conn.cancel(); return }
+                buf.append(chunk)
+            }
+            var tr = MessageReader(buf.subdata(in: 5..<9))
+            let ticket = (try? tr.u32()) ?? 0
+            await onUploadConnection?(PeerLink(conn), ticket, Data(buf.dropFirst(9)))
+        } else {
+            await onFileConnection?(PeerLink(conn), buf)
+        }
+    }
+
+    /// Returns true when the connection was handed to the upload engine
+    /// (caller must NOT cancel it then).
+    private func readPeerFrames(_ conn: NWConnection, pending: Data = Data(), username: String = "") async -> Bool {
         var reader = FrameReader()
         reader.append(pending)
         while !Task.isCancelled {
             while let frame = try? reader.next() {
+                if frame.code == 43 {
+                    // QueueDownload: hand the connection to the upload engine.
+                    var r = MessageReader(frame.payload)
+                    if let filename = try? r.string() {
+                        await onUploadRequest?(PeerLink(conn), username, filename, reader.rest())
+                        return true
+                    }
+                }
                 await handlePeerFrame(frame)
             }
-            guard let chunk = await receiveChunk(conn) else { return }
+            guard let chunk = await receiveChunk(conn) else { return false }
             reader.append(chunk)
         }
+        return false
     }
 
     private func handlePeerFrame(_ frame: Frame) async {
