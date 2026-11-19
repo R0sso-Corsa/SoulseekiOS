@@ -22,10 +22,10 @@ final class ChatUITests: XCTestCase {
         passField.tap()
         passField.typeText(pass)
         app.buttons["connectButton"].tap()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 40), "login did not complete")
+        XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 40), "login did not complete")
 
         // Search first so the share picker has results.
-        app.tabBars.buttons["Search"].tap()
+        app.tapTab("Search")
         let searchField = app.textFields["searchField"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 10))
         searchField.tap()
@@ -34,7 +34,7 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["resultFilename"].firstMatch.waitForExistence(timeout: 90), "no search results")
 
         // Chat tab → create a group.
-        app.tabBars.buttons["Chat"].tap()
+        app.tapTab("Chat")
         let plus = app.buttons["newChatButton"]
         XCTAssertTrue(plus.waitForExistence(timeout: 10), "chat tab missing")
         plus.tap()

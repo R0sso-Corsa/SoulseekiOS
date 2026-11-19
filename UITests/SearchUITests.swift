@@ -23,7 +23,7 @@ final class SearchUITests: XCTestCase {
         password.typeText(pass)
         app.buttons["connectButton"].tap()
         // Connected state is now a TabView; the tab bar appearing is the signal.
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 30), "did not reach connected state")
+        XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 30), "did not reach connected state")
 
         // Switch to the Search tab and run a query.
         let searchTab = app.tabBars.buttons["Search"]

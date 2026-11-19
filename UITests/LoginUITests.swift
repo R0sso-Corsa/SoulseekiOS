@@ -46,7 +46,7 @@ final class LoginUITests: XCTestCase {
         app.buttons["connectButton"].tap()
 
         // Connected state is a TabView; check the Status tab for details.
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 30), "login did not reach Connected")
+        XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 30), "login did not reach Connected")
         let statusTab = app.tabBars.buttons["Status"]
         XCTAssertTrue(statusTab.waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 0.5) // let the tab transition settle

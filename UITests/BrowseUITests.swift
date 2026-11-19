@@ -22,9 +22,9 @@ final class BrowseUITests: XCTestCase {
         passField.tap()
         passField.typeText(pass)
         app.buttons["connectButton"].tap()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 40), "login did not complete")
+        XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 40), "login did not complete")
 
-        app.tabBars.buttons["Search"].tap()
+        app.tapTab("Search")
         let searchField = app.textFields["searchField"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 10))
         searchField.tap()
@@ -43,6 +43,14 @@ final class BrowseUITests: XCTestCase {
         browseButton.tap()
         let folder = app.descendants(matching: .any)["browseFolder"].firstMatch
         let errorText = app.staticTexts["browseError"]
+        // iOS 26 tap quirk: retry once if the tap didn't register.
+        let earlyDeadline = Date().addingTimeInterval(12)
+        while Date() < earlyDeadline && !folder.exists && !errorText.exists {
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        if !folder.exists && !errorText.exists {
+            browseButton.tap()
+        }
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline && !folder.exists && !errorText.exists {
             Thread.sleep(forTimeInterval: 0.5)

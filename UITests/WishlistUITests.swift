@@ -20,9 +20,9 @@ final class WishlistUITests: XCTestCase {
         passField.tap()
         passField.typeText(pass)
         app.buttons["connectButton"].tap()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 40), "login did not complete")
+        XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 40), "login did not complete")
 
-        app.tabBars.buttons["Search"].tap()
+        app.tapTab("Search")
         XCTAssertTrue(app.staticTexts["searchStatus"].waitForExistence(timeout: 10), "search screen not presented")
         let searchField = app.textFields["searchField"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 10))
@@ -32,7 +32,21 @@ final class WishlistUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["resultFilename"].firstMatch.waitForExistence(timeout: 90), "no results")
 
         // Save the current query, open the wishlist, verify the row.
-        app.buttons["saveWishButton"].tap()
+        // A transient drop may cover the UI with the login overlay; wait it out.
+        if app.textFields["usernameField"].exists {
+            XCTAssertTrue(app.textFields["usernameField"].waitForNonExistence(timeout: 40), "reconnect did not complete")
+            app.tapTab("Search")
+        }
+        let saveBtn = app.buttons["saveWishButton"]
+        if !saveBtn.waitForExistence(timeout: 10) {
+            let failShot = XCUIScreen.main.screenshot()
+            let failAtt = XCTAttachment(screenshot: failShot)
+            failAtt.name = "wishlist-FAILURE"
+            failAtt.lifetime = .keepAlways
+            add(failAtt)
+            XCTFail("saveWishButton missing")
+        }
+        saveBtn.tap()
         app.buttons["wishlistButton"].tap()
         let row = app.buttons["wishRow"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "wishlist row missing")

@@ -23,6 +23,7 @@ struct LoginView: View {
 
                     VStack(spacing: 0) {
                         TextField("Username", text: $model.username)
+                            .textContentType(nil)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .padding()
@@ -30,6 +31,7 @@ struct LoginView: View {
                         Divider()
                             .padding(.leading)
                         SecureField("Password", text: $model.password)
+                            .textContentType(nil)
                             .padding()
                             .accessibilityIdentifier("passwordField")
                     }

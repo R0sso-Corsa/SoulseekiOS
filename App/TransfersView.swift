@@ -3,40 +3,166 @@ import SoulseekCore
 
 struct TransfersView: View {
     @Bindable var model: TransfersModel
+    let appModel: AppModel
+    @State private var segment = 0
+    @State private var showSharing = false
 
     var body: some View {
         ZStack {
             GlassBackground()
-            List {
-                ForEach(model.transfers) { t in
-                    TransferRow(
-                        transfer: t,
-                        speed: model.speeds[t.id] ?? 0,
-                        onRetry: { model.retry(t.id) },
-                        onCancel: { model.cancel(t.id) },
-                        onQueuePlace: { model.queuePlace(t.id) }
-                    )
+            VStack(spacing: 0) {
+                Picker("Transfers", selection: $segment) {
+                    Text("Downloads").tag(0)
+                    Text("Uploads").tag(1)
                 }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .contentMargins(.bottom, 64, for: .scrollContent)
-            .overlay {
-                if model.transfers.isEmpty {
-                    ContentUnavailableView(
-                        "No transfers",
-                        systemImage: "arrow.down.circle",
-                        description: Text("Download files from the Search tab.")
-                    )
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+
+                if segment == 0 {
+                    downloadsList
+                } else {
+                    uploadsList
                 }
             }
         }
         .navigationTitle("Transfers")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Clear completed") { model.clearCompleted() }
-                    .accessibilityIdentifier("clearCompletedButton")
+                Button { showSharing = true } label: {
+                    Image(systemName: "folder.badge.gearshape")
+                }
+                .accessibilityIdentifier("sharingButton")
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Clear completed") {
+                    if segment == 0 { model.clearCompleted() }
+                    else { appModel.uploadsModel.clearCompleted() }
+                }
+                .accessibilityIdentifier("clearCompletedButton")
+            }
+        }
+        .sheet(isPresented: $showSharing) {
+            SharingSheet(appModel: appModel)
+        }
+    }
+
+    private var downloadsList: some View {
+        List {
+            ForEach(model.transfers) { t in
+                TransferRow(
+                    transfer: t,
+                    speed: model.speeds[t.id] ?? 0,
+                    onRetry: { model.retry(t.id) },
+                    onCancel: { model.cancel(t.id) },
+                    onQueuePlace: { model.queuePlace(t.id) }
+                )
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, 64, for: .scrollContent)
+        .overlay {
+            if model.transfers.isEmpty {
+                ContentUnavailableView(
+                    "No transfers",
+                    systemImage: "arrow.down.circle",
+                    description: Text("Download files from the Search tab.")
+                )
+            }
+        }
+    }
+
+    private var uploadsList: some View {
+        List {
+            ForEach(appModel.uploadsModel.uploads) { u in
+                UploadRow(upload: u) {
+                    appModel.uploadsModel.cancel(u.id)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, 64, for: .scrollContent)
+        .overlay {
+            if appModel.uploadsModel.uploads.isEmpty {
+                ContentUnavailableView(
+                    "No uploads",
+                    systemImage: "arrow.up.circle",
+                    description: Text("Share folders (folder button) so others can download from you.")
+                )
+            }
+        }
+    }
+}
+
+struct UploadRow: View {
+    let upload: UploadEngine.Upload
+    let onCancel: () -> Void
+
+    private var filename: String {
+        let name = upload.filename
+        if let i = name.lastIndex(where: { $0 == "\\" || $0 == "/" }) {
+            return String(name[name.index(after: i)...])
+        }
+        return name
+    }
+
+    private var isActive: Bool {
+        switch upload.state {
+        case .queued, .connecting, .transferring: return true
+        default: return false
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(filename)
+                .font(.subheadline)
+                .lineLimit(2)
+                .accessibilityIdentifier("uploadFilename")
+            HStack {
+                Text(upload.username)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                stateLabel
+                    .accessibilityIdentifier("uploadState")
+            }
+            if case .transferring = upload.state {
+                ProgressView(value: Double(upload.sent), total: Double(max(upload.size, 1)))
+                    .tint(.teal)
+                Text(String(format: "%.1f / %.1f MB", Double(upload.sent) / 1_048_576, Double(upload.size) / 1_048_576))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if isActive {
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(.glass)
+                    .tint(.red)
+                    .font(.caption)
+                    .accessibilityIdentifier("uploadCancelButton")
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var stateLabel: some View {
+        switch upload.state {
+        case .queued:
+            Text("Queued").font(.caption2).foregroundStyle(.secondary)
+        case .connecting:
+            Text("Connecting…").font(.caption2).foregroundStyle(.secondary)
+        case .transferring:
+            Text("Uploading").font(.caption2).foregroundStyle(.teal)
+        case .completed:
+            Label("Completed", systemImage: "checkmark.circle.fill")
+                .font(.caption2).foregroundStyle(.green)
+        case .failed(let reason):
+            Text(reason).font(.caption2).foregroundStyle(.red).lineLimit(2)
+        case .cancelled:
+            Text("Cancelled").font(.caption2).foregroundStyle(.secondary)
         }
     }
 }

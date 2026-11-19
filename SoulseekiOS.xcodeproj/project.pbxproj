@@ -21,13 +21,17 @@
 		5997FB79AEA0A955AF53B69F /* WishlistModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */; };
 		816CCAC6E593AFC2F8472CCD /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */; };
 		8B7FC377423FEDF8938FC36C /* ChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE56415029EAA10FDE2624FA /* ChatModel.swift */; };
+		97E558B40293D032B57E062D /* SharingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05522D9B8D0527B291356AF9 /* SharingUITests.swift */; };
 		9C9F574B6D6EEA597207BF9B /* TransfersModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAC8752410A23D728351862 /* TransfersModel.swift */; };
 		A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */; };
 		A99CA29523A7C22074DC4A1D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34AB7531761603E0550DCA9 /* GlassStyle.swift */; };
 		ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACC65140334C67989CF2407 /* LoginView.swift */; };
 		B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D01518FCEE615528776464F /* SearchView.swift */; };
+		BADEC50E4FFB1282F1CB6E3B /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 746AE3CD092D480A79485EBA /* TestHelpers.swift */; };
 		BF9C3E93624BFB97DBF3F624 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469C71F2B052D3754B85DF9A /* AppModel.swift */; };
+		CCE2BB7E0FF7CDA7AD242A25 /* UploadsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D13477C957BAF081597397F /* UploadsModel.swift */; };
 		E25A0FDBED7EBC47A73A0900 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCE411F2720855E77992687 /* ChatView.swift */; };
+		E83622A0F4DCB5B690E2F0BD /* SharingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74AEC45162387E08A99FC02F /* SharingSheet.swift */; };
 		EBB968700882DF939A2E5557 /* TransfersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE2208A487298B8DE1E39A6 /* TransfersView.swift */; };
 		FA90545AE8C5FB3EE4DECC65 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E50120037E89A83F6D9B65 /* ContentView.swift */; };
 /* End PBXBuildFile section */
@@ -43,6 +47,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		05522D9B8D0527B291356AF9 /* SharingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingUITests.swift; sourceTree = "<group>"; };
 		10B05165D9BA257D45076858 /* ConnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedView.swift; sourceTree = "<group>"; };
 		13134CEA7098BB2250077288 /* SearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUITests.swift; sourceTree = "<group>"; };
 		1D01518FCEE615528776464F /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
@@ -52,7 +57,10 @@
 		517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginUITests.swift; sourceTree = "<group>"; };
 		5D771E7F90F60B1F8D953E13 /* SearchModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchModel.swift; sourceTree = "<group>"; };
 		6CAC8752410A23D728351862 /* TransfersModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersModel.swift; sourceTree = "<group>"; };
+		746AE3CD092D480A79485EBA /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
+		74AEC45162387E08A99FC02F /* SharingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingSheet.swift; sourceTree = "<group>"; };
 		7ACC65140334C67989CF2407 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		8D13477C957BAF081597397F /* UploadsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadsModel.swift; sourceTree = "<group>"; };
 		9FE2208A487298B8DE1E39A6 /* TransfersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersView.swift; sourceTree = "<group>"; };
 		A07284A0AF7DF221236AC2CE /* WishlistSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistSheet.swift; sourceTree = "<group>"; };
 		A7E50120037E89A83F6D9B65 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -89,6 +97,8 @@
 				F74810D4B1081A9C71BD0FD8 /* ChatUITests.swift */,
 				517DE2369F72C6FB7422D2D3 /* LoginUITests.swift */,
 				13134CEA7098BB2250077288 /* SearchUITests.swift */,
+				05522D9B8D0527B291356AF9 /* SharingUITests.swift */,
+				746AE3CD092D480A79485EBA /* TestHelpers.swift */,
 				42345204484841821C430142 /* WishlistUITests.swift */,
 			);
 			path = UITests;
@@ -134,9 +144,11 @@
 				7ACC65140334C67989CF2407 /* LoginView.swift */,
 				5D771E7F90F60B1F8D953E13 /* SearchModel.swift */,
 				1D01518FCEE615528776464F /* SearchView.swift */,
+				74AEC45162387E08A99FC02F /* SharingSheet.swift */,
 				E2BA0F8CD6A131615EDE26C6 /* SoulseekiOSApp.swift */,
 				6CAC8752410A23D728351862 /* TransfersModel.swift */,
 				9FE2208A487298B8DE1E39A6 /* TransfersView.swift */,
+				8D13477C957BAF081597397F /* UploadsModel.swift */,
 				D4FBB5551CA092FEF8A6CBF6 /* UserView.swift */,
 				DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */,
 				A07284A0AF7DF221236AC2CE /* WishlistSheet.swift */,
@@ -251,9 +263,11 @@
 				ABE494F70C31041A3177CE6D /* LoginView.swift in Sources */,
 				13F8BB00A9BB3AEDD50CD7CE /* SearchModel.swift in Sources */,
 				B45A8772B3CE24F4A7F27AC7 /* SearchView.swift in Sources */,
+				E83622A0F4DCB5B690E2F0BD /* SharingSheet.swift in Sources */,
 				32344354A83D63F035B0BBE7 /* SoulseekiOSApp.swift in Sources */,
 				9C9F574B6D6EEA597207BF9B /* TransfersModel.swift in Sources */,
 				EBB968700882DF939A2E5557 /* TransfersView.swift in Sources */,
+				CCE2BB7E0FF7CDA7AD242A25 /* UploadsModel.swift in Sources */,
 				816CCAC6E593AFC2F8472CCD /* UserView.swift in Sources */,
 				5997FB79AEA0A955AF53B69F /* WishlistModel.swift in Sources */,
 				306230C656C371EFD44169FB /* WishlistSheet.swift in Sources */,
@@ -268,6 +282,8 @@
 				143C8837127414BF1AAC57F7 /* ChatUITests.swift in Sources */,
 				A6935BB732F1B14F68E58D61 /* LoginUITests.swift in Sources */,
 				2EC6376A7E3ABF52B2E9F4B6 /* SearchUITests.swift in Sources */,
+				97E558B40293D032B57E062D /* SharingUITests.swift in Sources */,
+				BADEC50E4FFB1282F1CB6E3B /* TestHelpers.swift in Sources */,
 				49A0963DEC7F58D4762A2165 /* WishlistUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

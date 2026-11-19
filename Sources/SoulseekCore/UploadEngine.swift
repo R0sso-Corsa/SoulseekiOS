@@ -23,6 +23,10 @@ public actor UploadEngine {
 
     public private(set) var uploads: [Upload] = []
     public var slots: Int = 2
+
+    public func setSlots(_ n: Int) {
+        slots = max(1, n)
+    }
     public nonisolated let updates: AsyncStream<[Upload]>
     private let updatesContinuation: AsyncStream<[Upload]>.Continuation
 
