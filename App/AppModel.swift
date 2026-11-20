@@ -40,7 +40,7 @@ final class AppModel {
         }
     }
     private let pathMonitor = NWPathMonitor()
-    private var onCellular = false
+    private(set) var onCellular = false
     private var policyPaused = false
 
     let searchEngine: SearchEngine
@@ -58,6 +58,12 @@ final class AppModel {
     let uploadEngine: UploadEngine
     let uploadsModel: UploadsModel
     let libraryModel: LibraryModel
+    let mediaStore: MediaStore
+    let receivedMediaDir: URL
+    let sentMediaDir: URL
+    /// UI-test hook: a pre-registered media card the attach button sends
+    /// directly (bypasses the photo picker, which tests can't drive).
+    private(set) var uiTestSeedMedia: MediaCard?
     private let connection = ServerConnection()
     private let keychain = KeychainStore()
     private var stateTask: Task<Void, Never>?
@@ -73,8 +79,16 @@ final class AppModel {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        let transfers = TransferEngine(server: connection, directory: documents.appendingPathComponent("Downloads"))
+        let receivedMediaDir = support.appendingPathComponent("ChatMedia")
+        let sentMediaDir = support.appendingPathComponent("ChatMediaSent")
+        try? FileManager.default.createDirectory(at: receivedMediaDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: sentMediaDir, withIntermediateDirectories: true)
+        self.receivedMediaDir = receivedMediaDir
+        self.sentMediaDir = sentMediaDir
+        let transfers = TransferEngine(server: connection, directory: documents.appendingPathComponent("Downloads"),
+                                       mediaDirectory: receivedMediaDir)
         transferEngine = transfers
+        mediaStore = MediaStore(transfers: transfers, receivedDir: receivedMediaDir, sentDir: sentMediaDir)
         let browse = BrowseEngine(server: connection)
         browseEngine = browse
         shareIndex = ShareIndex(storeURL: support.appendingPathComponent("shares.json"))
@@ -130,6 +144,33 @@ final class AppModel {
             try? FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
             try? Data((0..<4096).map { UInt8($0 % 251) }).write(to: downloads.appendingPathComponent("Seed Track.mp3"))
             libraryModel.refresh()
+        }
+        if CommandLine.arguments.contains("-UITestSeedMedia") {
+            // 1×1 red PNG, registered and ready to send without the picker.
+            let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
+            let name = "seed-photo.png"
+            let url = sentMediaDir.appendingPathComponent(name)
+            try? png.write(to: url)
+            let virtual = "ChatMedia\\" + name
+            Task { await shareIndex.registerMedia(virtualPath: virtual, localPath: url.path, size: UInt64(png.count)) }
+            uiTestSeedMedia = MediaCard(username: "", path: virtual, size: UInt64(png.count), kind: .image, ext: "png")
+        }
+        // TTL cleanup: sent attachments live 7 days (recipients fetch them
+        // live), received media 30 days.
+        Task { [sentMediaDir, receivedMediaDir, shareIndex] in
+            let now = Date()
+            for (dir, days) in [(sentMediaDir, 7.0), (receivedMediaDir, 30.0)] {
+                let urls = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+                for url in urls {
+                    let mod = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? now
+                    if now.timeIntervalSince(mod) > days * 86_400 {
+                        try? FileManager.default.removeItem(at: url)
+                        if dir == sentMediaDir {
+                            await shareIndex.unregisterMedia(virtualPath: "ChatMedia\\" + url.lastPathComponent)
+                        }
+                    }
+                }
+            }
         }
         if let saved = try? keychain.load() {
             username = saved.username
@@ -245,6 +286,24 @@ final class AppModel {
     }
 
     func shareRoots() async -> [String] { await shareIndex.roots }
+
+    /// Save a picked photo/video, register it for upload, and send the media
+    /// card into the conversation (AD-16). Returns an error string or nil.
+    func attachMedia(data: Data, ext: String, kind: MediaCard.Kind, to conversationID: String) async -> String? {
+        let cap: Int = kind == .image ? 15_000_000 : 100_000_000
+        guard data.count <= cap else {
+            return kind == .image ? "Photos are limited to 15 MB." : "Videos are limited to 100 MB."
+        }
+        guard !username.isEmpty else { return "Not connected." }
+        let name = UUID().uuidString + "." + ext
+        let url = sentMediaDir.appendingPathComponent(name)
+        do { try data.write(to: url) } catch { return "Couldn't save the attachment." }
+        let virtual = "ChatMedia\\" + name
+        await shareIndex.registerMedia(virtualPath: virtual, localPath: url.path, size: UInt64(data.count))
+        let card = MediaCard(username: username, path: virtual, size: UInt64(data.count), kind: kind, ext: ext)
+        await chatEngine.sendMedia(card, to: conversationID)
+        return nil
+    }
 
     func shareCounts() async -> (files: Int, folders: Int) {
         (await shareIndex.files.count, await shareIndex.folderCount)

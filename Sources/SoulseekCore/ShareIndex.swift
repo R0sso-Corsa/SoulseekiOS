@@ -1,7 +1,7 @@
 import Foundation
 
 /// One shared audio file: virtual Soulseek path → local file.
-public struct SharedFile: Equatable, Sendable {
+public struct SharedFile: Equatable, Sendable, Codable {
     public let virtualPath: String
     public let localPath: String
     public let size: UInt64
@@ -13,8 +13,14 @@ public actor ShareIndex {
     public private(set) var roots: [String] = []
     public private(set) var files: [String: SharedFile] = [:]
     public private(set) var folderCount: Int = 0
+    /// Chat media attachments (AD-16): reachable by exact virtual path from
+    /// the card, but NOT listed in browse/share counts — private to the chat.
+    public private(set) var mediaFiles: [String: SharedFile] = [:]
 
     private let storeURL: URL
+    private nonisolated var mediaStoreURL: URL {
+        storeURL.deletingLastPathComponent().appendingPathComponent("chat-media.json")
+    }
     private static let audioExtensions: Set<String> = [
         "mp3", "flac", "wav", "m4a", "aac", "ogg", "wma", "ape", "wv", "alac", "aiff", "opus",
     ]
@@ -28,6 +34,27 @@ public actor ShareIndex {
         let scanned = Self.scan(roots)
         files = scanned.0
         folderCount = scanned.1
+        if let data = try? Data(contentsOf: mediaStoreURL),
+           let saved = try? JSONDecoder().decode([String: SharedFile].self, from: data) {
+            mediaFiles = saved.filter { FileManager.default.fileExists(atPath: $0.value.localPath) }
+        }
+    }
+
+    /// Register a chat-media file for upload (sender side of AD-16).
+    public func registerMedia(virtualPath: String, localPath: String, size: UInt64) {
+        mediaFiles[virtualPath] = SharedFile(virtualPath: virtualPath, localPath: localPath, size: size)
+        saveMedia()
+    }
+
+    public func unregisterMedia(virtualPath: String) {
+        mediaFiles[virtualPath] = nil
+        saveMedia()
+    }
+
+    private func saveMedia() {
+        if let data = try? JSONEncoder().encode(mediaFiles) {
+            try? data.write(to: mediaStoreURL, options: .atomic)
+        }
     }
 
     public func addRoot(_ path: String) {
@@ -48,7 +75,7 @@ public actor ShareIndex {
     }
 
     public func file(for virtualPath: String) -> SharedFile? {
-        files[virtualPath]
+        files[virtualPath] ?? mediaFiles[virtualPath]
     }
 
     private static func scan(_ roots: [String]) -> ([String: SharedFile], Int) {

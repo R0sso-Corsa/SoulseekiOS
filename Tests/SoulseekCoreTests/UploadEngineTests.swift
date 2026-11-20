@@ -120,6 +120,68 @@ final class UploadEngineTests: XCTestCase {
         XCTAssertTrue(done, "upload not completed: \(states)")
     }
 
+    /// AD-16 sender side: a registered chat-media file (not an audio root)
+    /// is served byte-exact over the normal direct-F upload path.
+    func testUploadRegisteredMediaDirectF() async throws {
+        let server = try FakeServer()
+        let downloader = try FakeServer()
+        defer { server.close(); downloader.close() }
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let media = Data((0..<8192).map { UInt8(($0 * 7) % 251) })
+        let fileURL = tmp.appendingPathComponent("photo.jpg")
+        try media.write(to: fileURL)
+        let virtualPath = "ChatMedia\\photo.jpg"
+        let index = ShareIndex(storeURL: tmp.appendingPathComponent("shares.json"))
+        await index.registerMedia(virtualPath: virtualPath, localPath: fileURL.path, size: UInt64(media.count))
+
+        let conn = ServerConnection()
+        let uploads = UploadEngine(server: conn, index: index)
+        let search = SearchEngine(server: conn,
+            onUploadRequest: { link, user, file, pending in
+                await uploads.handleQueueDownload(link, username: user, filename: file, pending: pending)
+            },
+            onPierce: { link, ticket, pending in
+                await uploads.handleIndirectUpload(link, ticket: ticket, pending: pending)
+            })
+        try await login(conn, server)
+        addTeardownBlock { await uploads.shutdown(); await search.shutdown(); await conn.disconnect() }
+
+        try sendConnectToP(server, username: "downloader", port: downloader.port, ticket: 55)
+        try downloader.accept()
+        _ = try downloader.readInitFrame() // PierceFw
+        try downloader.send(PeerMessages.queueDownload(filename: virtualPath))
+
+        let treq = try downloader.readFrame()
+        XCTAssertEqual(treq.code, 40)
+        var tr = MessageReader(treq.payload)
+        XCTAssertEqual(try tr.u32(), 0)
+        let ticket = try tr.u32()
+        XCTAssertEqual(try tr.string(), virtualPath)
+        XCTAssertEqual(try tr.u64(), UInt64(media.count))
+        try downloader.send(PeerMessages.transferReply(ticket: ticket, allowed: true, filesize: UInt64(media.count)))
+
+        try sendAddressReply(server, username: "downloader", port: downloader.port)
+        try downloader.accept()
+        var ticketBuf = [UInt8](repeating: 0, count: 4)
+        XCTAssertEqual(recv(downloader.clientFd, &ticketBuf, 4, 0), 4)
+        var off = MessageWriter()
+        off.u64(0)
+        try downloader.send(Data(off.bytes))
+
+        var received = Data()
+        while received.count < media.count {
+            var buf = [UInt8](repeating: 0, count: 65536)
+            let n = recv(downloader.clientFd, &buf, buf.count, 0)
+            guard n > 0 else { break }
+            received.append(Data(buf[0..<n]))
+        }
+        XCTAssertEqual(received, media, "media upload bytes differ")
+        let done = await waitForUpload(uploads) { $0.state == .completed && $0.sent == UInt64(media.count) }
+        XCTAssertTrue(done, "media upload not completed")
+    }
+
     /// Full INDIRECT upload (both behind NAT): address reply port 0 → we send
     /// ConnectToPeer(F) → downloader dials OUR listener with PierceFw →
     /// ticket → offset → exact bytes.

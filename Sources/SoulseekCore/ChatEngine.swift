@@ -14,6 +14,7 @@ public actor ChatEngine {
         public let isMine: Bool
         public let isSystem: Bool
         public let card: MusicCard?
+        public let media: MediaCard?
 
         init(serverID: UInt32? = nil, sender: String, text: String, date: Date = Date(),
              isMine: Bool, isSystem: Bool = false) {
@@ -25,6 +26,7 @@ public actor ChatEngine {
             self.isMine = isMine
             self.isSystem = isSystem
             self.card = isSystem ? nil : MusicCard.parse(text)
+            self.media = isSystem ? nil : MediaCard.parse(text)
         }
     }
 
@@ -285,6 +287,17 @@ public actor ChatEngine {
 
     /// Send a music share card into a conversation ("pm:user" / "room:name").
     public func shareMusic(_ card: MusicCard, to conversationID: String) async {
+        if conversationID.hasPrefix("pm:") {
+            await sendPrivateMessage(to: String(conversationID.dropFirst(3)), text: card.encoded())
+        } else if conversationID.hasPrefix("room:") {
+            await say(in: String(conversationID.dropFirst(5)), text: card.encoded())
+        }
+    }
+
+    /// Send a picture/video attachment (AD-16): the file must already be
+    /// registered in the ShareIndex; recipients' apps fetch it over the
+    /// normal transfer path. Other clients see the plain text line.
+    public func sendMedia(_ card: MediaCard, to conversationID: String) async {
         if conversationID.hasPrefix("pm:") {
             await sendPrivateMessage(to: String(conversationID.dropFirst(3)), text: card.encoded())
         } else if conversationID.hasPrefix("room:") {

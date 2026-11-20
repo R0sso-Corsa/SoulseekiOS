@@ -88,6 +88,10 @@ final class ChatModel {
         Task { await engine.shareMusic(card, to: conversationID) }
     }
 
+    func sendMedia(_ card: MediaCard, to conversationID: String) {
+        Task { await engine.sendMedia(card, to: conversationID) }
+    }
+
     func refreshRoomList() {
         Task {
             await engine.requestRoomList()

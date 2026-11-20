@@ -555,6 +555,42 @@ final class ChatEngineTests: XCTestCase {
         XCTAssertFalse(texts.contains("tester left"), "own leave echo must be silent")
         XCTAssertEqual(texts.filter { $0 == "Joined jazz" }.count, 1, "rejoin must not re-note")
     }
+
+    /// AD-16: sendMedia goes out as the slsk-media text line (PM 22 / room 13)
+    /// and incoming lines parse into ChatMessage.media.
+    func testMediaCardSendAndReceive() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server)
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        let card = MediaCard(username: "tester", path: "ChatMedia\\x.jpg", size: 99, kind: .image, ext: "jpg")
+        await chat.sendMedia(card, to: "pm:alice")
+        let pm = try server.readFrame()
+        XCTAssertEqual(pm.code, 22)
+        var pr = MessageReader(pm.payload)
+        XCTAssertEqual(try pr.string(), "alice")
+        let sentText = try pr.string()
+        XCTAssertTrue(sentText.hasPrefix("slsk-media:"))
+        XCTAssertEqual(MediaCard.parse(sentText), card)
+        // Local echo carries the parsed media card.
+        let mine = await waitFor(chat) {
+            $0.first { $0.id == "pm:alice" }?.messages.contains { $0.media == card && $0.isMine } == true
+        }
+        XCTAssertTrue(mine, "sent media not rendered locally")
+
+        // Incoming room media line parses.
+        var say = MessageWriter()
+        say.string("jazz"); say.string("bob")
+        say.string(MediaCard(username: "bob", path: "ChatMedia\\v.mp4", size: 5000, kind: .video, ext: "mp4").encoded())
+        try server.send(say.frame(code: 13))
+        let got = await waitFor(chat) {
+            $0.first { $0.id == "room:jazz" }?.messages.contains { $0.media?.kind == .video && $0.sender == "bob" } == true
+        }
+        XCTAssertTrue(got, "incoming media card not parsed")
+    }
 }
 
 private extension Data {

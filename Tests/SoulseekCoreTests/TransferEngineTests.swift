@@ -119,6 +119,57 @@ final class TransferEngineTests: XCTestCase {
         await conn.disconnect()
     }
 
+    /// AD-16: downloadMedia uses the same transfer path but lands in the
+    /// media directory — never the music Downloads folder.
+    func testDownloadMediaLandsInMediaDirectory() async throws {
+        let server = try FakeServer()
+        let uploader = try FakeServer()
+        defer { server.close(); uploader.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let mediaDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir); try? FileManager.default.removeItem(at: mediaDir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir, mediaDirectory: mediaDir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+
+        let file = "ChatMedia\\photo-abc.jpg"
+        let payload = Data((0..<4096).map { UInt8($0 % 251) })
+        await engine.downloadMedia(username: "uploader", filename: file, size: UInt64(payload.count))
+
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        let queue = try uploader.readFrame()
+        XCTAssertEqual(queue.code, 43)
+
+        var treq = MessageWriter()
+        treq.u32(1); treq.u32(55); treq.string(file); treq.u64(UInt64(payload.count))
+        try uploader.send(treq.frame(code: 40))
+        _ = try uploader.readFrame() // TransferReply
+
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 99)
+        try uploader.accept()
+        _ = try uploader.readInitFrame() // PierceFw
+        try uploader.send(Data([55, 0, 0, 0]))
+        var offsetBuf = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &offsetBuf, 8, 0), 8)
+        try uploader.send(payload)
+
+        let done = await waitForTransfer(engine) { $0.state == .completed }
+        XCTAssertTrue(done, "media transfer did not complete")
+        let all = await engine.transfers
+        let t = try XCTUnwrap(all.first)
+        XCTAssertTrue(t.isMedia)
+        let path = try XCTUnwrap(t.localPath)
+        XCTAssertTrue(path.hasPrefix(mediaDir.path), "media landed outside media dir: \(path)")
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), payload)
+        let downloadContents = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        XCTAssertTrue(downloadContents.isEmpty, "media must not touch the Downloads folder")
+    }
+
     /// Backgrounding: pauseAll tears down active transfers but keeps the
     /// .partial; resumeAll re-handshakes and continues from the partial offset.
     func testPauseAndResumeAll() async throws {

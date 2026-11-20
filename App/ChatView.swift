@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
 import SoulseekCore
 import SoulseekProtocol
 
@@ -178,6 +180,8 @@ struct ConversationView: View {
     @State private var showManage = false
     @State private var hadConv = false
     @State private var joinTimedOut = false
+    @State private var mediaItem: PhotosPickerItem?
+    @State private var mediaError: String?
 
     private var conv: ChatEngine.Conversation? { chatModel.conversation(id) }
     private var isRoom: Bool { id.hasPrefix("room:") }
@@ -218,7 +222,9 @@ struct ConversationView: View {
                     ScrollView {
                         LazyVStack(spacing: 8) {
                             ForEach(conv?.messages ?? []) { msg in
-                                MessageBubble(message: msg) { card in
+                                MessageBubble(message: msg,
+                                              mediaStore: appModel.mediaStore,
+                                              allowCellular: !appModel.wiFiOnlyDownloads || !appModel.onCellular) { card in
                                     appModel.searchModel.download(path: card.path, size: card.size, from: card.username)
                                 }
                                 .id(msg.id)
@@ -241,6 +247,33 @@ struct ConversationView: View {
         .task {
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             if conv == nil { joinTimedOut = true }
+        }
+        .onChange(of: mediaItem) { _, item in
+            guard let item else { return }
+            Task {
+                defer { mediaItem = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self) else {
+                    mediaError = "Couldn't read that item."
+                    return
+                }
+                let isVideo = item.supportedContentTypes.contains {
+                    $0.conforms(to: .movie) || $0.conforms(to: .video)
+                }
+                let kind: MediaCard.Kind = isVideo ? .video : .image
+                let ext = item.supportedContentTypes.first?.preferredFilenameExtension
+                    ?? (isVideo ? "mp4" : "jpg")
+                if let err = await appModel.attachMedia(data: data, ext: ext, kind: kind, to: id) {
+                    mediaError = err
+                }
+            }
+        }
+        .alert("Attachment", isPresented: Binding(
+            get: { mediaError != nil },
+            set: { if !$0 { mediaError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(mediaError ?? "")
         }
         .onChange(of: conv?.id) { _, newID in
             // Pop when the room disappears (left, disbanded, membership revoked)
@@ -325,6 +358,26 @@ struct ConversationView: View {
                     .foregroundStyle(.orange)
             }
             .accessibilityIdentifier("shareMusicButton")
+            if let seed = appModel.uiTestSeedMedia {
+                // UI-test path: send the seeded photo without the picker.
+                Button {
+                    let card = MediaCard(username: appModel.username, path: seed.path,
+                                         size: seed.size, kind: seed.kind, ext: seed.ext)
+                    chatModel.sendMedia(card, to: id)
+                } label: {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.title3)
+                        .foregroundStyle(.orange)
+                }
+                .accessibilityIdentifier("attachMediaButton")
+            } else {
+                PhotosPicker(selection: $mediaItem, matching: .any(of: [.images, .videos])) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.title3)
+                        .foregroundStyle(.orange)
+                }
+                .accessibilityIdentifier("attachMediaButton")
+            }
             TextField("Message", text: $draft)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 12)
@@ -358,6 +411,8 @@ struct ConversationView: View {
 
 struct MessageBubble: View {
     let message: ChatEngine.ChatMessage
+    let mediaStore: MediaStore
+    let allowCellular: Bool
     let onDownload: (MusicCard) -> Void
 
     var body: some View {
@@ -366,6 +421,9 @@ struct MessageBubble: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
+        } else if let media = message.media {
+            MediaBubble(card: media, isMine: message.isMine, sender: message.sender,
+                        store: mediaStore, allowCellular: allowCellular)
         } else if let card = message.card {
             VStack(alignment: message.isMine ? .trailing : .leading, spacing: 2) {
                 if !message.isMine {

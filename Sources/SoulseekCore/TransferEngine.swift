@@ -27,6 +27,9 @@ public actor TransferEngine {
         public var received: UInt64 = 0
         public var localPath: String?
         public var ticket: UInt32?
+        /// Chat-media attachment (AD-16) — lands in mediaDirectory, not the
+        /// music Downloads folder.
+        public var isMedia = false
     }
 
     public private(set) var transfers: [Transfer] = []
@@ -35,6 +38,7 @@ public actor TransferEngine {
 
     private let server: ServerConnection
     private let directory: URL
+    private let mediaDirectory: URL?
     private var eventTask: Task<Void, Never>?
     private var serverEventTask: Task<Void, Never>?
     private var pConns: [UUID: NWConnection] = [:]
@@ -51,13 +55,17 @@ public actor TransferEngine {
         speedLimitKBs = kbps
     }
 
-    public init(server: ServerConnection, directory: URL) {
+    public init(server: ServerConnection, directory: URL, mediaDirectory: URL? = nil) {
         self.server = server
         self.directory = directory
+        self.mediaDirectory = mediaDirectory
         var cont: AsyncStream<[Transfer]>.Continuation?
         updates = AsyncStream { cont = $0 }
         updatesContinuation = cont!
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let mediaDirectory {
+            try? FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+        }
         eventTask = Task { await self.consumeFileEvents() }
         serverEventTask = Task { await self.consumeServerEvents() }
     }
@@ -85,6 +93,16 @@ public actor TransferEngine {
 
     public func download(username: String, filename: String, size: UInt64) async {
         let t = Transfer(id: UUID(), username: username, filename: filename, size: size)
+        transfers.append(t)
+        publish()
+        startRun(t.id)
+    }
+
+    /// Chat-media fetch (AD-16): same transfer path, separate destination so
+    /// pictures/videos never clutter the music Library.
+    public func downloadMedia(username: String, filename: String, size: UInt64) async {
+        var t = Transfer(id: UUID(), username: username, filename: filename, size: size)
+        t.isMedia = true
         transfers.append(t)
         publish()
         startRun(t.id)
@@ -330,8 +348,8 @@ public actor TransferEngine {
 
     private func streamFile(conn: NWConnection, id: UUID, pending: Data = Data()) async {
         guard let t = transfer(id) else { conn.cancel(); return }
-        let partialURL = partialURL(for: t.filename)
-        let finalURL = finalURL(for: t.filename)
+        let partialURL = partialURL(for: t.filename, isMedia: t.isMedia)
+        let finalURL = finalURL(for: t.filename, isMedia: t.isMedia)
 
         var offset: UInt64 = 0
         if let attrs = try? FileManager.default.attributesOfItem(atPath: partialURL.path),
@@ -474,11 +492,13 @@ public actor TransferEngine {
         filename.replacingOccurrences(of: "\\", with: "_").replacingOccurrences(of: "/", with: "_")
     }
 
-    private func partialURL(for filename: String) -> URL {
-        directory.appendingPathComponent(sanitized(filename) + ".partial")
+    private func partialURL(for filename: String, isMedia: Bool = false) -> URL {
+        let base = (isMedia ? mediaDirectory : nil) ?? directory
+        return base.appendingPathComponent(sanitized(filename) + ".partial")
     }
 
-    private func finalURL(for filename: String) -> URL {
-        directory.appendingPathComponent(sanitized(filename))
+    private func finalURL(for filename: String, isMedia: Bool = false) -> URL {
+        let base = (isMedia ? mediaDirectory : nil) ?? directory
+        return base.appendingPathComponent(sanitized(filename))
     }
 }
