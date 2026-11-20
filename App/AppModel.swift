@@ -145,6 +145,36 @@ final class AppModel {
             try? Data((0..<4096).map { UInt8($0 % 251) }).write(to: downloads.appendingPathComponent("Seed Track.mp3"))
             libraryModel.refresh()
         }
+        if CommandLine.arguments.contains("-UITestSeedPreview") {
+            // A REAL playable file: 3s 440Hz sine, 8kHz 16-bit mono WAV.
+            let downloads = documents.appendingPathComponent("Downloads")
+            try? FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+            let rate = 8000.0
+            var samples = Data()
+            for i in 0..<Int(rate * 3) {
+                var v = Int16(12000 * sin(2 * .pi * 440 * Double(i) / rate)).littleEndian
+                samples.append(Data(bytes: &v, count: 2))
+            }
+            func u32(_ x: UInt32) -> Data { var v = x.littleEndian; return Data(bytes: &v, count: 4) }
+            func u16(_ x: UInt16) -> Data { var v = x.littleEndian; return Data(bytes: &v, count: 2) }
+            var wav = Data()
+            wav.append("RIFF".data(using: .ascii)!)
+            wav.append(u32(UInt32(36 + samples.count)))
+            wav.append("WAVE".data(using: .ascii)!)
+            wav.append("fmt ".data(using: .ascii)!)
+            wav.append(u32(16))
+            wav.append(u16(1))              // PCM
+            wav.append(u16(1))              // mono
+            wav.append(u32(UInt32(rate)))
+            wav.append(u32(UInt32(rate) * 2))
+            wav.append(u16(2))
+            wav.append(u16(16))
+            wav.append("data".data(using: .ascii)!)
+            wav.append(u32(UInt32(samples.count)))
+            wav.append(samples)
+            try? wav.write(to: downloads.appendingPathComponent("Preview Tone.wav"))
+            libraryModel.refresh()
+        }
         if CommandLine.arguments.contains("-UITestSeedMedia") {
             // 96×96 test-pattern PNG, registered and ready to send without the picker.
             let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAIAAABt+uBvAAADEElEQVR4nO2cT2gTQRSH38bePPiHIh5EEQQRRBFEwaPQWw89lDm0SFARQVAvXkRQ1KIXEVQoiKiItzl78mBBPFiQFsEiAUsw9FAkiAreJSlZkk12f6G+N5tNfh9LW1oyk/14b/Zl5tFI5GNJZIvIxle7H0rFHH9MIiEZjDVEkXQoCEBBAAoCUBCAggAUBGAdBGAEASgIQEEACgJQEICCABQEYB0EYAQBKAhAQQAKAlAQgIKKIMj/dml/urLNy2jWQW9+pUpp53Gbu+vb/UhE0Nuffanp5n7T6c2dfmgFLdR7q/n+bm/aS/adriV+c6fpd248kKZIjgc6m//ww/XvpR9T93b5AGfzkZwwF7S47jbtBZp6sNubvv9S47vltahqp3uEa+vO9P1HcsowgpbXnKKajFB6tMcXL4KWLe0kxry6ZhVHjRiyuD7XbO10j3y55ixuxCyC7O30GN8kggwG/VJ1YewkZrlUdQUQ9HV1k4WyChdX3cBHUIsw4dNjrkEWVKkETa6eji5UNINoILY79NG7Kc0I+raS5+rTzrkVN5B1UIvw+dVjXqWbGtIUE7Uso6BQa1B1KbfnVzvx7OUlnWVoeCNIdLKMggAUBKCgUe4PihTGYAQBKAhAQaEKxf0TPu2ELyTx7K8mPAvFTPhZLIwg1R3FFnllWce8A7gfdGAy52anmBeTnvtBBdxylZIcnMrtWRbP+GxK5/nVSjFVQZLTSmSx+lgJOjSd50r0dNoX4Oj5sAuaaPEs807ZjpUgCZhodsllK+jojA/gqH3kJzO+SP1BEsmxWVtHHR1ms2qFT+KK5IZtE+en18o9it26H55ptLsWrwVPmtfJcsdD7f9DKdnlWjbJrPiK5FaoPumX2n3SZ8P0Sd8O90/e3j9X6LTfYO58sq3VTNDdLEE7/o7LCLCwtZ4maKi3XPsnXQIFQUFDfC7WP+kSGEFNmGIACgJQEICCABQEoCAA6yAA6yAAUwxAQQAKAlAQgIIAFGRVB/05Ulfck7be8970azPgfhCAggAUBKAgAAUBKEiy+QddBMIyenTCTAAAAABJRU5ErkJggg==")!

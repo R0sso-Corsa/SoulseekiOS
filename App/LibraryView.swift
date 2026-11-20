@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Completed-downloads library: list, sort, delete, export, storage usage.
-/// No playback (AD-15 — planned separately).
+/// Completed-downloads library: list, sort, delete, export, storage usage,
+/// and a preview player to verify files (AD-15 — full playback still planned
+/// separately).
 struct LibraryView: View {
     @Bindable var model: LibraryModel
     @State private var shareItem: URL?
+    @State private var previewItem: URL?
 
     var body: some View {
         List {
@@ -26,6 +28,14 @@ struct LibraryView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Button {
+                            previewItem = file.url
+                        } label: {
+                            Image(systemName: "play.circle")
+                                .foregroundStyle(.orange)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("libraryPreviewButton")
                         Button {
                             shareItem = file.url
                         } label: {
@@ -71,6 +81,14 @@ struct LibraryView: View {
         )) {
             if let shareItem {
                 ShareSheet(items: [shareItem])
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { previewItem != nil },
+            set: { if !$0 { previewItem = nil } }
+        )) {
+            if let previewItem {
+                PreviewPlayerSheet(url: previewItem)
             }
         }
         .onAppear { model.refresh() }
