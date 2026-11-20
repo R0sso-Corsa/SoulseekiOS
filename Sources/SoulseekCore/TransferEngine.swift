@@ -225,8 +225,38 @@ public actor TransferEngine {
     // MARK: - Download run
 
     private func startRun(_ id: UUID) {
+        guard let t = transfer(id) else { return }
+        // One active run per user: desktop uploaders drop competing
+        // connections from the same peer, so album tracks wait their turn.
+        if hasActiveRun(for: t.username, excluding: id) { return }
+        // Claim synchronously so a same-tick sibling sees us as active.
+        update(id, force: true) { $0.state = .connecting }
+        launchRun(id)
+    }
+
+    private func launchRun(_ id: UUID) {
         runTasks[id]?.cancel()
         runTasks[id] = Task { await self.runDownload(id) }
+    }
+
+    private func isActiveState(_ s: TransferState) -> Bool {
+        switch s {
+        case .connecting, .downloading, .waiting: return true
+        default: return false
+        }
+    }
+
+    private func hasActiveRun(for username: String, excluding id: UUID) -> Bool {
+        transfers.contains { $0.username == username && $0.id != id && isActiveState($0.state) }
+    }
+
+    /// A run finished — start the next queued transfer for the same user.
+    private func startNextPending(for username: String) {
+        guard !hasActiveRun(for: username, excluding: UUID()) else { return }
+        if let next = transfers.first(where: { $0.username == username && $0.state == .queued }) {
+            update(next.id, force: true) { $0.state = .connecting }
+            launchRun(next.id)
+        }
     }
 
     private func runDownload(_ id: UUID) async {
@@ -473,6 +503,14 @@ public actor TransferEngine {
         if force || now.timeIntervalSince(lastPublish[id] ?? .distantPast) >= 0.25 {
             lastPublish[id] = now
             publish()
+        }
+        let state = transfers[idx].state
+        let username = transfers[idx].username
+        switch state {
+        case .completed, .failed, .cancelled:
+            startNextPending(for: username)
+        default:
+            break
         }
     }
 

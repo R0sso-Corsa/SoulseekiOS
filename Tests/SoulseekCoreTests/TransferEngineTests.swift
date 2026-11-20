@@ -211,6 +211,80 @@ final class TransferEngineTests: XCTestCase {
         XCTAssertEqual(map["@@music_Artist_Album_01 Track.mp3"], file)
     }
 
+    /// Album downloads: two files from the SAME user serialize — the second
+    /// stays queued until the first finishes (desktop uploaders drop
+    /// competing connections from one peer), then auto-starts.
+    func testSameUserDownloadsSerialize() async throws {
+        let server = try FakeServer()
+        let uploader = try FakeServer()
+        defer { server.close(); uploader.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+
+        let file1 = "Album\\01.mp3"
+        let file2 = "Album\\02.mp3"
+        let payload = Data((0..<1024).map { UInt8($0 % 251) })
+        await engine.download(username: "uploader", filename: file1, size: UInt64(payload.count))
+        await engine.download(username: "uploader", filename: file2, size: UInt64(payload.count))
+
+        // First run claims the connection; second must wait.
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        let q1 = try uploader.readFrame()
+        XCTAssertEqual(q1.code, 43)
+        var q1r = MessageReader(q1.payload)
+        XCTAssertEqual(try q1r.string(), file1)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let states = await engine.transfers.map(\.state)
+        XCTAssertEqual(states.count, 2)
+        if case .queued = states[1] {} else {
+            XCTFail("second same-user transfer must stay queued, got \(states[1])")
+        }
+
+        // Complete file 1.
+        var treq = MessageWriter()
+        treq.u32(1); treq.u32(55); treq.string(file1); treq.u64(UInt64(payload.count))
+        try uploader.send(treq.frame(code: 40))
+        _ = try uploader.readFrame()
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 99)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        try uploader.send(Data([55, 0, 0, 0]))
+        var off = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &off, 8, 0), 8)
+        try uploader.send(payload)
+        let done1 = await waitForTransfer(engine) { $0.filename == file1 && $0.state == .completed }
+        XCTAssertTrue(done1, "first transfer did not complete")
+
+        // File 2 auto-starts: new address request + P dial + queue.
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        let q2 = try uploader.readFrame()
+        XCTAssertEqual(q2.code, 43)
+        var q2r = MessageReader(q2.payload)
+        XCTAssertEqual(try q2r.string(), file2)
+        var treq2 = MessageWriter()
+        treq2.u32(1); treq2.u32(56); treq2.string(file2); treq2.u64(UInt64(payload.count))
+        try uploader.send(treq2.frame(code: 40))
+        _ = try uploader.readFrame()
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 100)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        try uploader.send(Data([56, 0, 0, 0]))
+        XCTAssertEqual(recv(uploader.clientFd, &off, 8, 0), 8)
+        try uploader.send(payload)
+        let done2 = await waitForTransfer(engine) { $0.filename == file2 && $0.state == .completed }
+        XCTAssertTrue(done2, "second transfer did not auto-start/complete")
+    }
+
     /// Backgrounding: pauseAll tears down active transfers but keeps the
     /// .partial; resumeAll re-handshakes and continues from the partial offset.
     func testPauseAndResumeAll() async throws {

@@ -133,7 +133,9 @@ public actor BrowseEngine {
             reader.append(chunk)
             while let frame = try reader.next() {
                 if frame.code == 5 {
-                    return try SharedFileList(payload: frame.payload).folders
+                    // Empty dirs (0 files) are dead ends in the flat browse
+                    // list — SoulseekQt sends them; drop them.
+                    return try SharedFileList(payload: frame.payload).folders.filter { !$0.files.isEmpty }
                 }
             }
         }

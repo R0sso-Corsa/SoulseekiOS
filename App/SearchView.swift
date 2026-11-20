@@ -9,6 +9,7 @@ struct SearchView: View {
     @State private var showSettings = false
     @State private var showCustomBitrate = false
     @State private var customBitrateText = ""
+    @State private var queuedNotice: String?
 
     var body: some View {
         ZStack {
@@ -166,6 +167,16 @@ struct SearchView: View {
                                             .accessibilityIdentifier("freeSlotsBadge")
                                     }
                                     Text("\(group.avgSpeed / 1024) KB/s")
+                                    Spacer()
+                                    Button {
+                                        let n = model.downloadGroup(group)
+                                        queuedNotice = "Queued \(n) track\(n == 1 ? "" : "s") from \(group.username). See Transfers."
+                                    } label: {
+                                        Image(systemName: "arrow.down.circle")
+                                            .foregroundStyle(.orange)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("groupDownloadButton")
                                 }
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -230,6 +241,14 @@ struct SearchView: View {
             if let username = selectedUser, let appModel {
                 UserView(appModel: appModel, username: username)
             }
+        }
+        .alert("Album queued", isPresented: Binding(
+            get: { queuedNotice != nil },
+            set: { if !$0 { queuedNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(queuedNotice ?? "")
         }
     }
 }

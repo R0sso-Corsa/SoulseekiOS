@@ -95,6 +95,22 @@ final class SearchModel {
         Task { await transferEngine?.download(username: username, filename: path, size: size) }
     }
 
+    /// Album download: queue every file of a search-result group (full paths).
+    func downloadGroup(_ group: ResultGroup) -> Int {
+        for file in group.files {
+            download(file, from: group.username)
+        }
+        return group.files.count
+    }
+
+    /// Album download from browse: queue every file of a shared folder.
+    func downloadFolder(_ folder: SharedFolder, from username: String) -> Int {
+        for file in folder.files {
+            download(path: folder.path + "\\" + file.path, size: file.size, from: username)
+        }
+        return folder.files.count
+    }
+
     private func scheduleRecompute() {
         recomputeTask?.cancel()
         let replies = engineState.replies

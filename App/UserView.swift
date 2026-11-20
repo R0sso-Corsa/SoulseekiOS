@@ -10,6 +10,7 @@ struct UserView: View {
     @State private var stats: UserStats?
     @State private var status: UserStatus?
     @State private var folders: [SharedFolder]?
+    @State private var queuedNotice: String?
     @State private var browseError: String?
     @State private var browsing = false
     @Environment(\.dismiss) private var dismiss
@@ -77,19 +78,31 @@ struct UserView: View {
                     if let folders {
                         Section("\(folders.count) folders") {
                             ForEach(folders, id: \.path) { folder in
-                                NavigationLink {
-                                    FolderFilesView(folder: folder, username: username, appModel: appModel)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(folder.path)
-                                            .font(.subheadline)
-                                            .lineLimit(2)
-                                        Text("\(folder.files.count) files")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
+                                HStack {
+                                    NavigationLink {
+                                        FolderFilesView(folder: folder, username: username, appModel: appModel)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(folder.path)
+                                                .font(.subheadline)
+                                                .lineLimit(2)
+                                            Text("\(folder.files.count) files")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
+                                    .accessibilityIdentifier("browseFolder")
+                                    Button {
+                                        let n = appModel.searchModel.downloadFolder(folder, from: username)
+                                        queuedNotice = "Queued \(n) track\(n == 1 ? "" : "s") from \(folder.path). See Transfers."
+                                    } label: {
+                                        Image(systemName: "arrow.down.circle")
+                                            .font(.title3)
+                                            .foregroundStyle(.orange)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("folderDownloadButton")
                                 }
-                                .accessibilityIdentifier("browseFolder")
                             }
                         }
                     }
@@ -103,6 +116,14 @@ struct UserView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .alert("Album queued", isPresented: Binding(
+                get: { queuedNotice != nil },
+                set: { if !$0 { queuedNotice = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(queuedNotice ?? "")
             }
             .task { await loadInfo() }
         }
@@ -151,6 +172,7 @@ struct FolderFilesView: View {
     let folder: SharedFolder
     let username: String
     let appModel: AppModel
+    @State private var queuedNotice: String?
 
     var body: some View {
         ZStack {
@@ -171,5 +193,25 @@ struct FolderFilesView: View {
         }
         .navigationTitle(folder.path)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    let n = appModel.searchModel.downloadFolder(folder, from: username)
+                    queuedNotice = "Queued \(n) track\(n == 1 ? "" : "s"). See Transfers."
+                } label: {
+                    Label("Download all", systemImage: "arrow.down.circle")
+                }
+                .disabled(folder.files.isEmpty)
+                .accessibilityIdentifier("folderDownloadButton")
+            }
+        }
+        .alert("Album queued", isPresented: Binding(
+            get: { queuedNotice != nil },
+            set: { if !$0 { queuedNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(queuedNotice ?? "")
+        }
     }
 }
