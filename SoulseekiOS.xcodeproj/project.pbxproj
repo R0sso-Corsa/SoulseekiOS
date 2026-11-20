@@ -31,6 +31,7 @@
 		5997FB79AEA0A955AF53B69F /* WishlistModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6479E53CAB9D4ED4A3704C /* WishlistModel.swift */; };
 		5C8E19DC339766F20B1E0A14 /* PreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AB6FCBC13E724B3317963F8 /* PreviewPlayer.swift */; };
 		5FDD94A324C9B08D8B3B15BC /* MediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82081D9DF910925C50E17899 /* MediaStore.swift */; };
+		62DE88A8F5B0F87F72BCF332 /* AlbumDownloadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 319B72ABA4AA0095DA3B95B2 /* AlbumDownloadUITests.swift */; };
 		693288E4FD7FED07F549CFAE /* ScopedSearchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D2FE29624D7D48E823832E /* ScopedSearchUITests.swift */; };
 		73B7D45D2A536E749088C21D /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536A3E55DF84D53E37D375DC /* LibraryModel.swift */; };
 		8137581503554A3002E800D0 /* AutoLoginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9662B329026A532D2B4F039 /* AutoLoginUITests.swift */; };
@@ -76,6 +77,7 @@
 		13134CEA7098BB2250077288 /* SearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUITests.swift; sourceTree = "<group>"; };
 		1D01518FCEE615528776464F /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		301680BE77400AB4AFFFE7C9 /* FilterUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterUITests.swift; sourceTree = "<group>"; };
+		319B72ABA4AA0095DA3B95B2 /* AlbumDownloadUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDownloadUITests.swift; sourceTree = "<group>"; };
 		349C4FAAF8188B9ABC51F2A6 /* BackgroundResumeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundResumeUITests.swift; sourceTree = "<group>"; };
 		3FA896C59EBF67275ACDD076 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		42345204484841821C430142 /* WishlistUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistUITests.swift; sourceTree = "<group>"; };
@@ -143,6 +145,7 @@
 		0B4DA347CD42C68A2021B584 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				319B72ABA4AA0095DA3B95B2 /* AlbumDownloadUITests.swift */,
 				CA8C56F97CC4C51FE37178C4 /* AlbumUITests.swift */,
 				C9662B329026A532D2B4F039 /* AutoLoginUITests.swift */,
 				349C4FAAF8188B9ABC51F2A6 /* BackgroundResumeUITests.swift */,
@@ -366,6 +369,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				62DE88A8F5B0F87F72BCF332 /* AlbumDownloadUITests.swift in Sources */,
 				FD6F45F1DE10E5C18E3B9FF0 /* AlbumUITests.swift in Sources */,
 				8137581503554A3002E800D0 /* AutoLoginUITests.swift in Sources */,
 				CB61047397122EE1103D288A /* BackgroundResumeUITests.swift in Sources */,
