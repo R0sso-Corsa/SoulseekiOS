@@ -430,6 +430,42 @@ final class ChatEngineTests: XCTestCase {
         XCTAssertEqual(try rr.string(), "vault")
         XCTAssertEqual(try rr.u32(), 1)
     }
+
+    /// Invited while OFFLINE (e.g. from a desktop client): the membership
+    /// shows up in RoomList's private arrays on next login — the engine must
+    /// auto-join those rooms so they appear in Chat without manual steps.
+    func testOfflineInviteAutoJoinsFromRoomList() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server)
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        // RoomList(64): no public/owned rooms, one private membership.
+        try server.send(Data(hexString: "000000000000000000000000000000000100000007000000696e7669746564010000000200000000000000").framePayloadAsCode(64))
+        let join = try server.readFrame()
+        XCTAssertEqual(join.code, 14, "engine did not auto-join the invited room")
+        var jr = MessageReader(join.payload)
+        XCTAssertEqual(try jr.string(), "invited")
+        XCTAssertEqual(try jr.u32(), 1, "must join as private")
+
+        // Private join reply → conversation appears.
+        try server.send(Data(hexString: "07000000696e76697465640100000003000000626f62010000000200000001000000e80300000500000000000000640000000a000000010000000000000001000000020000005553060000007465737465720100000005000000616c696365").framePayloadAsCode(14))
+        let joined = await waitFor(chat) { $0.contains { $0.id == "room:invited" && $0.isPrivate } }
+        XCTAssertTrue(joined, "invited room never appeared in conversations")
+
+        // A second RoomList must NOT re-join rooms we're already in.
+        try server.send(Data(hexString: "000000000000000000000000000000000100000007000000696e7669746564010000000200000000000000").framePayloadAsCode(64))
+        // Give the engine a moment; no new JoinRoom may be sent.
+        try await Task.sleep(nanoseconds: 300_000_000)
+        // readFrame would block if nothing was sent — use a short-read probe:
+        // FakeServer.readFrame blocks, so instead verify via a follow-up
+        // explicit action: send a PM and expect ONLY that frame next.
+        await chat.sendPrivateMessage(to: "bob", text: "ping")
+        let next = try server.readFrame()
+        XCTAssertEqual(next.code, 22, "unexpected extra frame (duplicate auto-join?)")
+    }
 }
 
 private extension Data {

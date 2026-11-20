@@ -132,13 +132,20 @@ final class PrivateRoomUITests: XCTestCase {
         XCTAssertTrue(browse.waitForExistence(timeout: 10), "menu did not open")
         browse.tap()
 
+        // "Your groups" may push public rows below the fold — scroll first.
+        app.swipeUp()
+        app.swipeUp()
         let firstRow = app.buttons["roomRow"].firstMatch
         XCTAssertTrue(firstRow.waitForExistence(timeout: 25), "room list never loaded")
         let before = app.buttons.matching(identifier: "roomRow").count
         XCTAssertGreaterThan(before, 10, "expected many public rooms")
 
+        // Scroll back to the top — offscreen elements are absent from the
+        // AX hierarchy, so the search field must be visible before tapping.
+        app.swipeDown()
+        app.swipeDown()
         let search = app.textFields["roomSearchField"]
-        XCTAssertTrue(search.exists, "room search field missing")
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "search field not visible at top")
         search.tap()
         search.typeText("zzzznope")
         Thread.sleep(forTimeInterval: 1.5)
@@ -153,6 +160,8 @@ final class PrivateRoomUITests: XCTestCase {
         } else {
             search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8))
         }
+        app.swipeUp()
+        app.swipeUp()
         XCTAssertTrue(firstRow.waitForExistence(timeout: 10), "rows did not return after clearing search")
     }
 }

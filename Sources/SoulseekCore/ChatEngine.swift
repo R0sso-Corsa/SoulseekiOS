@@ -352,6 +352,15 @@ public actor ChatEngine {
                 }
             case .roomList(let list):
                 roomList = list
+                // Resolve memberships granted while we were OFFLINE (e.g. a
+                // desktop client invited us): the private arrays list rooms
+                // we belong to — auto-join any we're not already in.
+                var pending = Set(list.privateRooms.map(\.name))
+                pending.formUnion(list.ownedPrivateRooms.map(\.name))
+                pending.formUnion(list.operatedRooms)
+                for name in pending.sorted() where conversation("room:\(name)") == nil {
+                    try? await server.send(frame: ServerMessages.joinRoom(room: name, type: 1))
+                }
             case .roomTickers(let tickers):
                 if var conv = conversation("room:\(tickers.room)") {
                     conv.tickers = Dictionary(uniqueKeysWithValues: tickers.entries.map { ($0.username, $0.message) })
