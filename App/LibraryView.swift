@@ -7,6 +7,7 @@ struct LibraryView: View {
     @Bindable var model: LibraryModel
     @State private var shareItem: URL?
     @State private var previewItem: URL?
+    @State private var deleteTarget: LibraryModel.LibraryFile?
 
     var body: some View {
         List {
@@ -44,6 +45,14 @@ struct LibraryView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("libraryShareButton")
+                        Button {
+                            deleteTarget = file
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("libraryDeleteRowButton")
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
@@ -90,6 +99,22 @@ struct LibraryView: View {
             if let previewItem {
                 PreviewPlayerSheet(url: previewItem)
             }
+        }
+        .confirmationDialog(
+            "Delete \(deleteTarget?.name ?? "")?",
+            isPresented: Binding(
+                get: { deleteTarget != nil },
+                set: { if !$0 { deleteTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let file = deleteTarget { model.delete(file) }
+                deleteTarget = nil
+            }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        } message: {
+            Text("This removes the file from your device. You can download it again later.")
         }
         .onAppear { model.refresh() }
     }
