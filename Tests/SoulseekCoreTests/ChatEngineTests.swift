@@ -505,7 +505,55 @@ final class ChatEngineTests: XCTestCase {
         XCTAssertTrue(conv?.messages.contains { $0.text == "old message" } == true,
                       "history lost on rejoin")
         let joinNotes = conv?.messages.filter { $0.text == "Joined jazz" }.count ?? 0
-        XCTAssertEqual(joinNotes, 2, "consecutive rejoins must dedupe join notes (1 initial + 1 after activity)")
+        XCTAssertEqual(joinNotes, 1, "rejoins must be silent — only the FIRST join gets a note")
+    }
+
+    /// Reconnect noise: our own join/leave echoes (server broadcasts them to
+    /// us too) must not produce "<me> joined/left" notes, and rejoining an
+    /// existing room must not re-add "Joined X".
+    func testReconnectJoinNotesAreSilent() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server) // username "tester"
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        let fixture = Data(hexString: "040000006a617a7a0200000005000000616c69636503000000626f6202000000020000000100000002000000e80300000500000000000000640000000a000000d00700000900000000000000c80000001400000002000000000000000100000002000000020000005553020000004445")
+        await chat.joinRoom("jazz")
+        _ = try server.readFrame()
+        try server.send(fixture.framePayloadAsCode(14))
+        _ = await waitFor(chat) { $0.contains { $0.id == "room:jazz" } }
+
+        // Our OWN join echo (16) — no "tester joined" note allowed.
+        var ownJoin = MessageWriter()
+        ownJoin.string("jazz"); ownJoin.string("tester")
+        ownJoin.u32(2); ownJoin.u32(3000); ownJoin.u32(1); ownJoin.u32(0)
+        ownJoin.u32(300); ownJoin.u32(30); ownJoin.u32(0); ownJoin.string("US")
+        try server.send(ownJoin.frame(code: 16))
+        // Someone else joins — note IS allowed.
+        try server.send(Data(hexString: "040000006a617a7a050000006361726f6c02000000b80b000001000000000000002c0100001e00000000000000020000004652").framePayloadAsCode(16))
+        let carolNoted = await waitFor(chat) {
+            $0.first { $0.id == "room:jazz" }?.messages.contains { $0.text == "carol joined" } == true
+        }
+        XCTAssertTrue(carolNoted, "other users' joins should still be noted")
+        // Our OWN leave echo (17) — no "tester left" note allowed.
+        var ownLeave = MessageWriter()
+        ownLeave.string("jazz"); ownLeave.string("tester")
+        try server.send(ownLeave.frame(code: 17))
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        // Rejoin — no second "Joined jazz".
+        await chat.rejoinRooms()
+        _ = try server.readFrame()
+        try server.send(fixture.framePayloadAsCode(14))
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        let conv = await chat.conversations.first { $0.id == "room:jazz" }
+        let texts = conv?.messages.map(\.text) ?? []
+        XCTAssertFalse(texts.contains("tester joined"), "own join echo must be silent")
+        XCTAssertFalse(texts.contains("tester left"), "own leave echo must be silent")
+        XCTAssertEqual(texts.filter { $0 == "Joined jazz" }.count, 1, "rejoin must not re-note")
     }
 }
 

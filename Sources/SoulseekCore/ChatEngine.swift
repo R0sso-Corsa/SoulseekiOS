@@ -322,6 +322,7 @@ public actor ChatEngine {
                 append(to: "room:\(rm.room)", kind: .room, name: rm.room,
                        message: ChatMessage(sender: rm.username, text: rm.message, isMine: rm.username == me))
             case .roomJoined(let rj):
+                let firstJoin = conversation("room:\(rj.room)") == nil
                 var conv = conversation("room:\(rj.room)") ?? Conversation(id: "room:\(rj.room)", kind: .room, name: rj.room)
                 conv.members = rj.members
                 conv.owner = rj.owner
@@ -329,9 +330,8 @@ public actor ChatEngine {
                 conv.operators = rj.operators
                 conv.privateMembers = rj.members.map(\.username)
                 upsert(conv)
-                // Don't spam "Joined X" on every reconnect — only when the
-                // last note isn't already this join.
-                if conv.messages.last?.text != "Joined \(rj.room)" {
+                // Rejoins (reconnects) are silent — only the FIRST join notes.
+                if firstJoin {
                     system("room:\(rj.room)", kind: .room, name: rj.room, "Joined \(rj.room)")
                 } else {
                     publish()
@@ -352,13 +352,22 @@ public actor ChatEngine {
                         conv.members.append(uj.member)
                     }
                     upsert(conv)
-                    system("room:\(uj.room)", kind: .room, name: uj.room, "\(uj.member.username) joined")
+                    // The server echoes our OWN joins back to us — stay silent.
+                    if await uj.member.username != server.username {
+                        system("room:\(uj.room)", kind: .room, name: uj.room, "\(uj.member.username) joined")
+                    } else {
+                        publish()
+                    }
                 }
             case .userLeftRoom(let ul):
                 if var conv = conversation("room:\(ul.room)") {
                     conv.members.removeAll { $0.username == ul.username }
                     upsert(conv)
-                    system("room:\(ul.room)", kind: .room, name: ul.room, "\(ul.username) left")
+                    if await ul.username != server.username {
+                        system("room:\(ul.room)", kind: .room, name: ul.room, "\(ul.username) left")
+                    } else {
+                        publish()
+                    }
                 }
             case .roomList(let list):
                 roomList = list
