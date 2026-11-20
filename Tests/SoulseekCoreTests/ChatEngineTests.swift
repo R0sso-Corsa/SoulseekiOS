@@ -466,6 +466,47 @@ final class ChatEngineTests: XCTestCase {
         let next = try server.readFrame()
         XCTAssertEqual(next.code, 22, "unexpected extra frame (duplicate auto-join?)")
     }
+
+    /// Rejoining a room (reconnect) must PRESERVE its message history and
+    /// not spam duplicate "Joined" notes on consecutive rejoins.
+    func testRejoinPreservesHistory() async throws {
+        let server = try FakeServer()
+        defer { server.close() }
+        let conn = ServerConnection()
+        let chat = ChatEngine(server: conn)
+        try await login(conn, server)
+        addTeardownBlock { await chat.shutdown(); await conn.disconnect() }
+
+        let fixture = Data(hexString: "040000006a617a7a0200000005000000616c69636503000000626f6202000000020000000100000002000000e80300000500000000000000640000000a000000d00700000900000000000000c80000001400000002000000000000000100000002000000020000005553020000004445")
+        await chat.joinRoom("jazz")
+        _ = try server.readFrame()
+        try server.send(fixture.framePayloadAsCode(14))
+        let joined = await waitFor(chat) { $0.contains { $0.id == "room:jazz" } }
+        XCTAssertTrue(joined)
+
+        // A chat message arrives (server echo of SayChatroom).
+        var say = MessageWriter()
+        say.string("jazz"); say.string("alice"); say.string("old message")
+        try server.send(say.frame(code: 13))
+        let gotMsg = await waitFor(chat) {
+            $0.first { $0.id == "room:jazz" }?.messages.contains { $0.text == "old message" } == true
+        }
+        XCTAssertTrue(gotMsg, "chat message missing")
+
+        // Rejoin twice (two reconnects).
+        for _ in 0..<2 {
+            await chat.rejoinRooms()
+            let rj = try server.readFrame()
+            XCTAssertEqual(rj.code, 14)
+            try server.send(fixture.framePayloadAsCode(14))
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+        let conv = await chat.conversations.first { $0.id == "room:jazz" }
+        XCTAssertTrue(conv?.messages.contains { $0.text == "old message" } == true,
+                      "history lost on rejoin")
+        let joinNotes = conv?.messages.filter { $0.text == "Joined jazz" }.count ?? 0
+        XCTAssertEqual(joinNotes, 2, "consecutive rejoins must dedupe join notes (1 initial + 1 after activity)")
+    }
 }
 
 private extension Data {

@@ -111,6 +111,10 @@ public actor ChatEngine {
         }
     }
 
+    /// Room history cap per conversation (local only — the server stores no
+    /// room messages, so what the app received is all that can ever exist).
+    private static let historyCap = 500
+
     // MARK: - Persistence
 
     private struct ChatSnapshot: Codable {
@@ -151,7 +155,7 @@ public actor ChatEngine {
         let snap = ChatSnapshot(conversations: conversations.map { c in
             ChatSnapshot.Conv(
                 id: c.id, kind: c.kind.rawValue, name: c.name,
-                messages: c.messages.suffix(200).map {
+                messages: c.messages.suffix(Self.historyCap).map {
                     ChatSnapshot.Msg(serverID: $0.serverID, sender: $0.sender, text: $0.text,
                                      date: $0.date, isMine: $0.isMine, isSystem: $0.isSystem)
                 },
@@ -325,7 +329,13 @@ public actor ChatEngine {
                 conv.operators = rj.operators
                 conv.privateMembers = rj.members.map(\.username)
                 upsert(conv)
-                system("room:\(rj.room)", kind: .room, name: rj.room, "Joined \(rj.room)")
+                // Don't spam "Joined X" on every reconnect — only when the
+                // last note isn't already this join.
+                if conv.messages.last?.text != "Joined \(rj.room)" {
+                    system("room:\(rj.room)", kind: .room, name: rj.room, "Joined \(rj.room)")
+                } else {
+                    publish()
+                }
                 if pendingPrivateCreates.remove(rj.room) != nil && rj.owner == nil {
                     // Asked to create private, but the name already existed as
                     // a PUBLIC room — the server joined us to it instead.
