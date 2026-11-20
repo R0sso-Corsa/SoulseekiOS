@@ -289,11 +289,9 @@ final class AppModel {
 
     /// Save a picked photo/video, register it for upload, and send the media
     /// card into the conversation (AD-16). Returns an error string or nil.
+    /// No size cap (Eric 2026-11-20) — very large videos load into memory,
+    /// so extreme files may be slow or fail on-device.
     func attachMedia(data: Data, ext: String, kind: MediaCard.Kind, to conversationID: String) async -> String? {
-        let cap: Int = kind == .image ? 15_000_000 : 100_000_000
-        guard data.count <= cap else {
-            return kind == .image ? "Photos are limited to 15 MB." : "Videos are limited to 100 MB."
-        }
         guard !username.isEmpty else { return "Not connected." }
         let name = UUID().uuidString + "." + ext
         let url = sentMediaDir.appendingPathComponent(name)
