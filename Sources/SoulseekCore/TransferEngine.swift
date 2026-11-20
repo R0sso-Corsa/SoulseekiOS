@@ -436,8 +436,22 @@ public actor TransferEngine {
             }
             try FileManager.default.moveItem(at: partialURL, to: finalURL)
             update(id, force: true) { $0.state = .completed; $0.localPath = finalURL.path; $0.received = t.size }
+            if !t.isMedia {
+                recordManifest(filename: t.filename, storedAs: finalURL.lastPathComponent)
+            }
         } catch {
             fail(id, "finalize failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Maps stored flat filenames → original Soulseek paths so the Library
+    /// can group downloads by album. Hidden JSON sidecar in the download dir.
+    private func recordManifest(filename: String, storedAs: String) {
+        let url = directory.appendingPathComponent(".downloads-manifest.json")
+        var map = (try? JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))) ?? [:]
+        map[storedAs] = filename
+        if let data = try? JSONEncoder().encode(map) {
+            try? data.write(to: url, options: .atomic)
         }
     }
 

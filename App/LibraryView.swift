@@ -1,68 +1,109 @@
 import SwiftUI
 
-/// Completed-downloads library: list, sort, delete, export, storage usage,
-/// and a preview player to verify files (AD-15 — full playback still planned
-/// separately).
+/// Completed-downloads library, grouped by album: tap a title to preview
+/// (album queue), play-all per album, two-step delete (swipe → Delete →
+/// confirm) for tracks and whole albums. AD-15 — full playback still
+/// planned separately.
 struct LibraryView: View {
     @Bindable var model: LibraryModel
     @State private var shareItem: URL?
-    @State private var previewItem: URL?
+    @State private var previewQueue: [URL] = []
+    @State private var previewIndex = 0
     @State private var deleteTarget: LibraryModel.LibraryFile?
+    @State private var deleteAlbumTarget: LibraryModel.Album?
 
     var body: some View {
         List {
-            Section {
-                if model.files.isEmpty {
-                    Text("No downloads yet")
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("libraryEmpty")
-                }
-                ForEach(model.files) { file in
+            if model.files.isEmpty {
+                Text("No downloads yet")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("libraryEmpty")
+            }
+            ForEach(model.albums) { album in
+                Section {
+                    ForEach(album.files) { file in
+                        HStack {
+                            Button {
+                                previewQueue = album.files.map(\.url)
+                                previewIndex = album.files.firstIndex(of: file) ?? 0
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(file.name)
+                                        .font(.subheadline)
+                                        .lineLimit(2)
+                                        .accessibilityIdentifier("libraryFile")
+                                    Text("\(sizeText(file.size)) · \(file.date.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("libraryTitleButton")
+                            Spacer()
+                            Button {
+                                shareItem = file.url
+                            } label: {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundStyle(.orange)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("libraryShareButton")
+                            Button {
+                                deleteTarget = file
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("libraryDeleteRowButton")
+                        }
+                        .swipeActions(edge: .trailing) {
+                            // Two-step: swipe reveals Delete; tapping it asks
+                            // for confirmation before removing anything.
+                            Button(role: .destructive) {
+                                deleteTarget = file
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .accessibilityIdentifier("libraryDeleteButton")
+                        }
+                    }
+                } header: {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(file.name)
-                                .font(.subheadline)
-                                .lineLimit(2)
-                                .accessibilityIdentifier("libraryFile")
-                            Text("\(sizeText(file.size)) · \(file.date.formatted(date: .abbreviated, time: .omitted))")
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(album.name)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.primary)
+                                .accessibilityIdentifier("albumHeader")
+                            Text("\(album.files.count) track\(album.files.count == 1 ? "" : "s") · \(sizeText(album.totalBytes))")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                         Button {
-                            previewItem = file.url
+                            previewQueue = album.files.map(\.url)
+                            previewIndex = 0
                         } label: {
-                            Image(systemName: "play.circle")
+                            Image(systemName: "play.circle.fill")
+                                .font(.title3)
                                 .foregroundStyle(.orange)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("libraryPreviewButton")
-                        Button {
-                            shareItem = file.url
+                        .accessibilityIdentifier("albumPlayButton")
+                        Menu {
+                            Button("Delete album", role: .destructive) {
+                                deleteAlbumTarget = album
+                            }
+                            .accessibilityIdentifier("albumDeleteOption")
                         } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .foregroundStyle(.orange)
+                            Image(systemName: "ellipsis")
+                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("libraryShareButton")
-                        Button {
-                            deleteTarget = file
-                        } label: {
-                            Image(systemName: "trash")
-                                .foregroundStyle(.red)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("libraryDeleteRowButton")
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            model.delete(file)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .accessibilityIdentifier("libraryDeleteButton")
+                        .accessibilityIdentifier("albumMenu")
                     }
                 }
+            }
+            Section {
             } footer: {
                 Text("\(model.files.count) files · \(sizeText(model.totalBytes)) used")
                     .accessibilityIdentifier("libraryStorage")
@@ -93,12 +134,10 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: Binding(
-            get: { previewItem != nil },
-            set: { if !$0 { previewItem = nil } }
+            get: { !previewQueue.isEmpty },
+            set: { if !$0 { previewQueue = [] } }
         )) {
-            if let previewItem {
-                PreviewPlayerSheet(url: previewItem)
-            }
+            PreviewPlayerSheet(urls: previewQueue, startIndex: previewIndex)
         }
         .confirmationDialog(
             "Delete \(deleteTarget?.name ?? "")?",
@@ -115,6 +154,22 @@ struct LibraryView: View {
             Button("Cancel", role: .cancel) { deleteTarget = nil }
         } message: {
             Text("This removes the file from your device. You can download it again later.")
+        }
+        .confirmationDialog(
+            "Delete album \(deleteAlbumTarget?.name ?? "")?",
+            isPresented: Binding(
+                get: { deleteAlbumTarget != nil },
+                set: { if !$0 { deleteAlbumTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete \(deleteAlbumTarget?.files.count ?? 0) tracks", role: .destructive) {
+                if let album = deleteAlbumTarget { model.deleteAlbum(album) }
+                deleteAlbumTarget = nil
+            }
+            Button("Cancel", role: .cancel) { deleteAlbumTarget = nil }
+        } message: {
+            Text("This removes every track in the album from your device.")
         }
         .onAppear { model.refresh() }
     }

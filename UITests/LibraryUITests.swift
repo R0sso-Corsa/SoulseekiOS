@@ -35,7 +35,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(file.label, "Seed Track.mp3")
         XCTAssertTrue(app.staticTexts["libraryStorage"].exists, "storage footer missing")
 
-        // Swipe-delete the row (retry — iOS 26 tap quirk).
+        // Two-step swipe delete: swipe reveals Delete, tap asks confirmation.
         var deleted = false
         for _ in 0..<3 {
             file.swipeLeft()
@@ -43,7 +43,12 @@ final class LibraryUITests: XCTestCase {
             if delete.waitForExistence(timeout: 3) {
                 delete.tap()
             }
-            if app.staticTexts["libraryEmpty"].waitForExistence(timeout: 2) {
+            // Confirmation must appear — nothing is deleted before it.
+            let confirm = app.buttons.matching(NSPredicate(format: "label == 'Delete' AND identifier != 'libraryDeleteButton'")).firstMatch
+            if confirm.waitForExistence(timeout: 3) {
+                confirm.tap()
+            }
+            if app.staticTexts["libraryEmpty"].waitForExistence(timeout: 3) {
                 deleted = true
                 break
             }
@@ -91,7 +96,7 @@ final class LibraryUITests: XCTestCase {
         // Confirmation sheet → Delete (retry — iOS 26 sheet taps can no-op).
         var deleted = false
         for _ in 0..<3 {
-            let confirm = app.buttons["Delete"].firstMatch
+            let confirm = app.buttons.matching(NSPredicate(format: "label == 'Delete' AND identifier != 'libraryDeleteButton'")).firstMatch
             if confirm.waitForExistence(timeout: 5) {
                 confirm.tap()
             }

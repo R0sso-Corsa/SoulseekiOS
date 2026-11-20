@@ -170,6 +170,47 @@ final class TransferEngineTests: XCTestCase {
         XCTAssertTrue(downloadContents.isEmpty, "media must not touch the Downloads folder")
     }
 
+    /// Completed music downloads record their original Soulseek path in a
+    /// hidden manifest so the Library can group by album.
+    func testDownloadRecordsAlbumManifest() async throws {
+        let server = try FakeServer()
+        let uploader = try FakeServer()
+        defer { server.close(); uploader.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let conn = ServerConnection()
+        let engine = TransferEngine(server: conn, directory: dir)
+        addTeardownBlock { await engine.shutdown(); await conn.disconnect() }
+        try await login(conn, server)
+
+        let file = "@@music\\Artist\\Album\\01 Track.mp3"
+        let payload = Data((0..<512).map { UInt8($0 % 251) })
+        await engine.download(username: "uploader", filename: file, size: UInt64(payload.count))
+        try sendAddressReply(server, username: "uploader", port: uploader.port)
+        try uploader.accept()
+        _ = try uploader.readInitFrame()
+        _ = try uploader.readFrame() // QueueDownload
+        var treq = MessageWriter()
+        treq.u32(1); treq.u32(55); treq.string(file); treq.u64(UInt64(payload.count))
+        try uploader.send(treq.frame(code: 40))
+        _ = try uploader.readFrame() // TransferReply
+        try sendConnectToF(server, username: "uploader", port: uploader.port, ticket: 99)
+        try uploader.accept()
+        _ = try uploader.readInitFrame() // PierceFw
+        try uploader.send(Data([55, 0, 0, 0]))
+        var offsetBuf = [UInt8](repeating: 0, count: 8)
+        XCTAssertEqual(recv(uploader.clientFd, &offsetBuf, 8, 0), 8)
+        try uploader.send(payload)
+
+        let done = await waitForTransfer(engine) { $0.state == .completed }
+        XCTAssertTrue(done, "download did not complete")
+        let manifestURL = dir.appendingPathComponent(".downloads-manifest.json")
+        let map = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: manifestURL))
+        XCTAssertEqual(map["@@music_Artist_Album_01 Track.mp3"], file)
+    }
+
     /// Backgrounding: pauseAll tears down active transfers but keeps the
     /// .partial; resumeAll re-handshakes and continues from the partial offset.
     func testPauseAndResumeAll() async throws {

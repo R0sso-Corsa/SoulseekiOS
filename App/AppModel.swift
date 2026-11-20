@@ -117,6 +117,10 @@ final class AppModel {
         if CommandLine.arguments.contains("-UITestResetCredentials") {
             try? keychain.delete()
             try? FileManager.default.removeItem(at: support.appendingPathComponent("chat-history.json"))
+            // Test isolation: seeded libraries must not leak between runs.
+            let downloads = documents.appendingPathComponent("Downloads")
+            try? FileManager.default.removeItem(at: downloads)
+            try? FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         }
         chatEngine = ChatEngine(server: connection, storeURL: support.appendingPathComponent("chat-history.json"))
         chatModel = ChatModel(engine: chatEngine)
@@ -173,6 +177,43 @@ final class AppModel {
             wav.append(u32(UInt32(samples.count)))
             wav.append(samples)
             try? wav.write(to: downloads.appendingPathComponent("Preview Tone.wav"))
+            libraryModel.refresh()
+        }
+        if CommandLine.arguments.contains("-UITestSeedAlbum") {
+            // Two real playable tracks + manifest entries forming one album.
+            let downloads = documents.appendingPathComponent("Downloads")
+            try? FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+            func toneWAV(seconds: Double, freq: Double) -> Data {
+                let rate = 8000.0
+                var samples = Data()
+                for i in 0..<Int(rate * seconds) {
+                    var v = Int16(12000 * sin(2 * .pi * freq * Double(i) / rate)).littleEndian
+                    samples.append(Data(bytes: &v, count: 2))
+                }
+                func u32(_ x: UInt32) -> Data { var v = x.littleEndian; return Data(bytes: &v, count: 4) }
+                func u16(_ x: UInt16) -> Data { var v = x.littleEndian; return Data(bytes: &v, count: 2) }
+                var wav = Data()
+                wav.append("RIFF".data(using: .ascii)!)
+                wav.append(u32(UInt32(36 + samples.count)))
+                wav.append("WAVE".data(using: .ascii)!)
+                wav.append("fmt ".data(using: .ascii)!)
+                wav.append(u32(16)); wav.append(u16(1)); wav.append(u16(1))
+                wav.append(u32(UInt32(rate))); wav.append(u32(UInt32(rate) * 2))
+                wav.append(u16(2)); wav.append(u16(16))
+                wav.append("data".data(using: .ascii)!)
+                wav.append(u32(UInt32(samples.count)))
+                wav.append(samples)
+                return wav
+            }
+            try? toneWAV(seconds: 2, freq: 440).write(to: downloads.appendingPathComponent("01 First Tone.wav"))
+            try? toneWAV(seconds: 2, freq: 660).write(to: downloads.appendingPathComponent("02 Second Tone.wav"))
+            let manifest = [
+                "01 First Tone.wav": "Test Artist\\Test Album\\01 First Tone.wav",
+                "02 Second Tone.wav": "Test Artist\\Test Album\\02 Second Tone.wav",
+            ]
+            if let data = try? JSONEncoder().encode(manifest) {
+                try? data.write(to: downloads.appendingPathComponent(".downloads-manifest.json"))
+            }
             libraryModel.refresh()
         }
         if CommandLine.arguments.contains("-UITestSeedMedia") {

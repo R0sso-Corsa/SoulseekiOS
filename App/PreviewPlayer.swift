@@ -4,7 +4,8 @@ import Foundation
 /// In-app music preview (AD-15 scope: verify downloads, not a music player).
 /// Wraps AVPlayer with plain observable state; detects corrupt/undecodable
 /// files via item status + failed-to-play-end notifications, and marks a file
-/// verified once playback actually advances.
+/// verified once playback actually advances. Supports album queues with
+/// auto-advance and next/previous.
 @MainActor
 @Observable
 final class PreviewPlayer {
@@ -19,11 +20,24 @@ final class PreviewPlayer {
     private(set) var currentTime: Double = 0
     /// Playback advanced past the start — the file decodes cleanly.
     private(set) var verified = false
+    private(set) var queue: [URL] = []
+    private(set) var currentIndex = 0
 
     var duration: Double {
         if case .ready(let d) = status { return d }
         return 0
     }
+
+    var currentURL: URL? {
+        queue.indices.contains(currentIndex) ? queue[currentIndex] : nil
+    }
+
+    var currentTitle: String {
+        currentURL?.lastPathComponent ?? ""
+    }
+
+    var hasNext: Bool { currentIndex < queue.count - 1 }
+    var hasPrevious: Bool { currentIndex > 0 }
 
     /// Formats AVFoundation can decode. OGG/WMA/APE/WV have no decoder here.
     static let supportedExtensions: Set<String> = [
@@ -35,9 +49,37 @@ final class PreviewPlayer {
     private var rateObs: NSKeyValueObservation?
     private var timeObserver: Any?
     private var endObs: NSObjectProtocol?
+    private var failObs: NSObjectProtocol?
 
     func load(_ url: URL) {
+        loadQueue([url], at: 0)
+    }
+
+    func loadQueue(_ urls: [URL], at index: Int) {
+        guard !urls.isEmpty else { return }
         stop()
+        queue = urls
+        currentIndex = min(max(0, index), urls.count - 1)
+        loadCurrent(autoPlay: false)
+    }
+
+    func next() {
+        guard hasNext else { return }
+        let wasPlaying = isPlaying
+        currentIndex += 1
+        loadCurrent(autoPlay: wasPlaying)
+    }
+
+    func previous() {
+        guard hasPrevious else { return }
+        let wasPlaying = isPlaying
+        currentIndex -= 1
+        loadCurrent(autoPlay: wasPlaying)
+    }
+
+    private func loadCurrent(autoPlay: Bool) {
+        guard let url = currentURL else { return }
+        teardownItem()
         status = .loading
         verified = false
         currentTime = 0
@@ -61,17 +103,30 @@ final class PreviewPlayer {
                     let d = item.duration.seconds
                     if case .failed = self.status { return }
                     self.status = .ready(duration: d.isFinite ? d : -1)
+                    if autoPlay { self.player?.play() }
                 default:
                     break
                 }
             }
         }
-        endObs = NotificationCenter.default.addObserver(
+        failObs = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.status = .failed("Playback failed partway through — the file may be corrupted.")
                 self?.isPlaying = false
+            }
+        }
+        endObs = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.hasNext {
+                    self.next()
+                } else {
+                    self.isPlaying = false
+                }
             }
         }
         rateObs = p.observe(\.rate, options: [.new]) { [weak self] p, _ in
@@ -105,15 +160,23 @@ final class PreviewPlayer {
         seek(to: duration > 0 ? min(max(0, target), duration) : max(0, target))
     }
 
-    func stop() {
+    private func teardownItem() {
         if let timeObserver, let p = player { p.removeTimeObserver(timeObserver) }
         timeObserver = nil
         statusObs = nil
         rateObs = nil
         if let endObs { NotificationCenter.default.removeObserver(endObs) }
         endObs = nil
+        if let failObs { NotificationCenter.default.removeObserver(failObs) }
+        failObs = nil
         player?.pause()
         player = nil
         isPlaying = false
+    }
+
+    func stop() {
+        teardownItem()
+        queue = []
+        currentIndex = 0
     }
 }

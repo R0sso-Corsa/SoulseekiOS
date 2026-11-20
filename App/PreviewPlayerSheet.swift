@@ -1,12 +1,23 @@
 import SwiftUI
 
-/// Music preview sheet (AD-15 scope): play/pause, scrub, ±15s, and a clear
-/// verdict — "plays cleanly" for good files, an error for corrupt ones.
-/// Stops when dismissed; no background audio.
+/// Music preview sheet (AD-15 scope): play/pause, scrub, ±15s, track
+/// next/previous for albums, and a clear verdict — "plays cleanly" for good
+/// files, an error for corrupt ones. Stops when dismissed; no background audio.
 struct PreviewPlayerSheet: View {
-    let url: URL
+    let urls: [URL]
+    let startIndex: Int
     @State private var player = PreviewPlayer()
     @Environment(\.dismiss) private var dismiss
+
+    init(url: URL) {
+        self.urls = [url]
+        self.startIndex = 0
+    }
+
+    init(urls: [URL], startIndex: Int = 0) {
+        self.urls = urls
+        self.startIndex = startIndex
+    }
 
     var body: some View {
         NavigationStack {
@@ -14,10 +25,17 @@ struct PreviewPlayerSheet: View {
                 Image(systemName: "waveform.circle.fill")
                     .font(.system(size: 56))
                     .foregroundStyle(.orange)
-                Text(url.lastPathComponent)
+                Text(player.currentTitle.isEmpty ? (urls.first?.lastPathComponent ?? "") : player.currentTitle)
                     .font(.headline)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
+                    .accessibilityIdentifier("previewTrackTitle")
+                if urls.count > 1 {
+                    Text("Track \(player.currentIndex + 1) of \(urls.count)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("previewTrackPosition")
+                }
 
                 switch player.status {
                 case .loading:
@@ -51,7 +69,14 @@ struct PreviewPlayerSheet: View {
                     }
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
-                    HStack(spacing: 30) {
+                    HStack(spacing: 24) {
+                        if urls.count > 1 {
+                            Button { player.previous() } label: {
+                                Image(systemName: "backward.end.fill").font(.title3)
+                            }
+                            .disabled(!player.hasPrevious)
+                            .accessibilityIdentifier("previewPrevious")
+                        }
                         Button { player.skip(-15) } label: {
                             Image(systemName: "gobackward.15").font(.title2)
                         }
@@ -65,6 +90,13 @@ struct PreviewPlayerSheet: View {
                             Image(systemName: "goforward.15").font(.title2)
                         }
                         .accessibilityIdentifier("previewForward15")
+                        if urls.count > 1 {
+                            Button { player.next() } label: {
+                                Image(systemName: "forward.end.fill").font(.title3)
+                            }
+                            .disabled(!player.hasNext)
+                            .accessibilityIdentifier("previewNext")
+                        }
                     }
                     .foregroundStyle(.orange)
                 }
@@ -81,7 +113,7 @@ struct PreviewPlayerSheet: View {
             }
         }
         .presentationDetents([.medium])
-        .onAppear { player.load(url) }
+        .onAppear { player.loadQueue(urls, at: startIndex) }
         .onDisappear { player.stop() }
     }
 
