@@ -146,8 +146,8 @@ final class AppModel {
             libraryModel.refresh()
         }
         if CommandLine.arguments.contains("-UITestSeedMedia") {
-            // 1×1 red PNG, registered and ready to send without the picker.
-            let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
+            // 96×96 test-pattern PNG, registered and ready to send without the picker.
+            let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAIAAABt+uBvAAADEElEQVR4nO2cT2gTQRSH38bePPiHIh5EEQQRRBFEwaPQWw89lDm0SFARQVAvXkRQ1KIXEVQoiKiItzl78mBBPFiQFsEiAUsw9FAkiAreJSlZkk12f6G+N5tNfh9LW1oyk/14b/Zl5tFI5GNJZIvIxle7H0rFHH9MIiEZjDVEkXQoCEBBAAoCUBCAggAUBGAdBGAEASgIQEEACgJQEICCABQEYB0EYAQBKAhAQQAKAlAQgIKKIMj/dml/urLNy2jWQW9+pUpp53Gbu+vb/UhE0Nuffanp5n7T6c2dfmgFLdR7q/n+bm/aS/adriV+c6fpd248kKZIjgc6m//ww/XvpR9T93b5AGfzkZwwF7S47jbtBZp6sNubvv9S47vltahqp3uEa+vO9P1HcsowgpbXnKKajFB6tMcXL4KWLe0kxry6ZhVHjRiyuD7XbO10j3y55ixuxCyC7O30GN8kggwG/VJ1YewkZrlUdQUQ9HV1k4WyChdX3cBHUIsw4dNjrkEWVKkETa6eji5UNINoILY79NG7Kc0I+raS5+rTzrkVN5B1UIvw+dVjXqWbGtIUE7Uso6BQa1B1KbfnVzvx7OUlnWVoeCNIdLKMggAUBKCgUe4PihTGYAQBKAhAQaEKxf0TPu2ELyTx7K8mPAvFTPhZLIwg1R3FFnllWce8A7gfdGAy52anmBeTnvtBBdxylZIcnMrtWRbP+GxK5/nVSjFVQZLTSmSx+lgJOjSd50r0dNoX4Oj5sAuaaPEs807ZjpUgCZhodsllK+jojA/gqH3kJzO+SP1BEsmxWVtHHR1ms2qFT+KK5IZtE+en18o9it26H55ptLsWrwVPmtfJcsdD7f9DKdnlWjbJrPiK5FaoPumX2n3SZ8P0Sd8O90/e3j9X6LTfYO58sq3VTNDdLEE7/o7LCLCwtZ4maKi3XPsnXQIFQUFDfC7WP+kSGEFNmGIACgJQEICCABQEoCAA6yAA6yAAUwxAQQAKAlAQgIIAFGRVB/05Ulfck7be8970azPgfhCAggAUBKAgAAUBKEiy+QddBMIyenTCTAAAAABJRU5ErkJggg==")!
             let name = "seed-photo.png"
             let url = sentMediaDir.appendingPathComponent(name)
             try? png.write(to: url)
